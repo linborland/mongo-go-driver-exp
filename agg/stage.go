@@ -35,21 +35,28 @@ func MatchStage(f query.Filter) Stage {
 
 // SetField pairs a field name with the expression to assign to it.
 // Construct via Assign.
-type SetField struct {
+type SetField interface{ setField() setField }
+
+type setField struct {
 	name string
 	expr Expr
 }
 
+func (sf setField) setField() setField {
+	return sf
+}
+
 // Assign creates a SetField that sets the named field to expr.
 func Assign(field string, expr Expr) SetField {
-	return SetField{name: field, expr: expr}
+	return setField{name: field, expr: expr}
 }
 
 // SetStage produces a $set stage that adds or overwrites the given fields.
 func SetStage(fields ...SetField) Stage {
 	doc := make(bson.D, len(fields))
 	for i, f := range fields {
-		doc[i] = bson.E{Key: f.name, Value: f.expr}
+		sf := f.setField()
+		doc[i] = bson.E{Key: sf.name, Value: sf.expr}
 	}
 	return Stage{{Key: "$set", Value: doc}}
 }
@@ -58,39 +65,39 @@ func SetStage(fields ...SetField) Stage {
 
 // ProjectionField specifies what to do with one field in a $project stage.
 // Construct via Include, Exclude, or Compute.
-type ProjectionField interface{ projectionField() projectionField }
+type ProjectionField interface{ projectField() projectField }
 
-type projectionField struct {
+type projectField struct {
 	name string
 	// val is int32(1), int32(0), or an Expr. Constrained by constructors.
 	val any
 }
 
-func (pf projectionField) projectionField() projectionField {
+func (pf projectField) projectField() projectField {
 	return pf
 }
 
 // Include retains the named field in the output document (sets it to 1).
 func Include(field string) ProjectionField {
-	return projectionField{name: field, val: int32(1)}
+	return projectField{name: field, val: int32(1)}
 }
 
 // Exclude removes the named field from the output document (sets it to 0).
 func Exclude(field string) ProjectionField {
-	return projectionField{name: field, val: int32(0)}
+	return projectField{name: field, val: int32(0)}
 }
 
 // Compute adds a new (or replaces an existing) field whose value is the
 // result of expr.
 func Compute(field string, expr Expr) ProjectionField {
-	return projectionField{name: field, val: expr}
+	return projectField{name: field, val: expr}
 }
 
 // ProjectStage produces a $project stage from the given field specs.
 func ProjectStage(specs ...ProjectionField) Stage {
 	doc := make(bson.D, len(specs))
 	for i, s := range specs {
-		pf := s.projectionField()
+		pf := s.projectField()
 		doc[i] = bson.E{Key: pf.name, Value: pf.val}
 	}
 	return Stage{{Key: "$project", Value: doc}}
@@ -147,4 +154,37 @@ func SortStage(specs ...SortSpec) Stage {
 		doc[i] = bson.E{Key: s.Field, Value: s.Order.bsonValue()}
 	}
 	return Stage{{Key: "$sort", Value: doc}}
+}
+
+// --- $group ---
+
+// GroupField pairs a field name with an accumulator expression for use in a
+// $group stage. Construct via Accumulate.
+type GroupField interface{ groupField() groupField }
+
+type groupField struct {
+	name        string
+	accumulator Accumulator
+}
+
+func (gf groupField) groupField() groupField {
+	return gf
+}
+
+// Accumulate creates a GroupField that computes acc for each group and stores
+// the result in the named field.
+func Accumulate(field string, acc Accumulator) GroupField {
+	return groupField{name: field, accumulator: acc}
+}
+
+// GroupStage produces a $group stage that groups documents by _id and computes
+// the given accumulator fields for each group.
+func GroupStage[T AnyExpr | ObjectExpr | string](_id T, fields ...GroupField) Stage {
+	doc := make(bson.D, 0, len(fields)+1)
+	doc = append(doc, bson.E{Key: "_id", Value: _id})
+	for _, f := range fields {
+		gf := f.groupField()
+		doc = append(doc, bson.E{Key: gf.name, Value: gf.accumulator})
+	}
+	return Stage{{Key: "$group", Value: doc}}
 }

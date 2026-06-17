@@ -41,6 +41,10 @@ func AnyField(fieldPath string) AnyExpr {
 	return AnyExpr{expr: fieldPath}
 }
 
+// Null is an AnyExpr that evaluates to BSON null. Use as the _id in
+// GroupStage to accumulate all documents into a single group.
+var Null = AnyExpr{expr: nil}
+
 type NumberExpr struct {
 	expr Expr
 }
