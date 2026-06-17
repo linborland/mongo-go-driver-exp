@@ -1,0 +1,19 @@
+.vscode
+debug
+.idea
+*.iml
+*.ipr
+*.iws
+.idea
+*.sublime-project
+*.sublime-workspace
+*.test
+.DS_Store
+.cache
+test.suite
+go.work.sum
+.task
+bin
+
+# Personal Claude Code instructions (use CLAUDE.md for team-shared content)
+CLAUDE.local.md
