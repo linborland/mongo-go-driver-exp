@@ -16,10 +16,10 @@ func (a Accumulator) MarshalBSON() ([]byte, error) {
 
 // CustomAccumulator defines a custom accumulator function using JavaScript ($accumulator).
 // Pass nil for initArgs or finalize to omit those optional fields.
-func CustomAccumulator[A ArrayTypes](init, accumulate string, accumulateArgs A, merge, lang string, initArgs *ArrayExpr, finalize *string) Accumulator {
+func CustomAccumulator[A ArrayTypes](init, accumulate string, accumulateArgs A, merge, lang string, initArgs []any, finalize *string) Accumulator {
 	doc := bson.D{{Key: "init", Value: init}}
 	if initArgs != nil {
-		doc = append(doc, bson.E{Key: "initArgs", Value: *initArgs})
+		doc = append(doc, bson.E{Key: "initArgs", Value: initArgs})
 	}
 	doc = append(doc,
 		bson.E{Key: "accumulate", Value: accumulate},
@@ -80,13 +80,9 @@ func BottomNAccumulator[T Expr, U NumberTypes](n U, output T, sortBy ...SortFiel
 
 // --- $concatArrays ---
 
-// ConcatArraysAccumulator concatenates arrays to return the concatenated array ($concatArrays).
-func ConcatArraysAccumulator[T ArrayTypes](arrays ...T) Accumulator {
-	vals := make(bson.A, len(arrays))
-	for i, a := range arrays {
-		vals[i] = a
-	}
-	return Accumulator{doc: bson.D{{Key: "$concatArrays", Value: vals}}}
+// ConcatArraysAccumulator concatenates the arrays from each document in the group ($concatArrays).
+func ConcatArraysAccumulator[T ArrayTypes](expr T) Accumulator {
+	return Accumulator{doc: bson.D{{Key: "$concatArrays", Value: expr}}}
 }
 
 // --- $count ---
@@ -120,18 +116,13 @@ func DenseRankAccumulator() Accumulator {
 // --- $derivative ---
 
 // DerivativeAccumulator returns the average rate of change within the specified window ($derivative).
-func DerivativeAccumulator[T Expr](input T) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$derivative", Value: bson.D{
-		{Key: "input", Value: input},
-	}}}}
-}
-
-// DerivativeUnitAccumulator returns the average rate of change within the specified window with a time unit ($derivative).
-func DerivativeUnitAccumulator[T Expr](input T, unit string) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$derivative", Value: bson.D{
-		{Key: "input", Value: input},
-		{Key: "unit", Value: unit},
-	}}}}
+// Pass a non-nil unit to specify a time unit (e.g. "week").
+func DerivativeAccumulator[T Expr](input T, unit *string) Accumulator {
+	doc := bson.D{{Key: "input", Value: input}}
+	if unit != nil {
+		doc = append(doc, bson.E{Key: "unit", Value: *unit})
+	}
+	return Accumulator{doc: bson.D{{Key: "$derivative", Value: doc}}}
 }
 
 // --- $documentNumber ---
@@ -143,20 +134,18 @@ func DocumentNumberAccumulator() Accumulator {
 
 // --- $expMovingAvg ---
 
-// ExpMovingAvgNAccumulator returns the exponential moving average using a historical document count N ($expMovingAvg).
-func ExpMovingAvgNAccumulator[T NumberTypes](input T, n int32) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$expMovingAvg", Value: bson.D{
-		{Key: "input", Value: input},
-		{Key: "N", Value: n},
-	}}}}
-}
-
-// ExpMovingAvgAlphaAccumulator returns the exponential moving average using an exponential decay value alpha ($expMovingAvg).
-func ExpMovingAvgAlphaAccumulator[T NumberTypes](input T, alpha float64) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$expMovingAvg", Value: bson.D{
-		{Key: "input", Value: input},
-		{Key: "alpha", Value: alpha},
-	}}}}
+// ExpMovingAvgAccumulator returns the exponential moving average of the input expression ($expMovingAvg).
+// Pass a non-nil n to use a historical document count, or a non-nil alpha to use an exponential decay value.
+// Exactly one of n or alpha must be non-nil.
+func ExpMovingAvgAccumulator[T NumberTypes](input T, n *int32, alpha *float64) Accumulator {
+	doc := bson.D{{Key: "input", Value: input}}
+	if n != nil {
+		doc = append(doc, bson.E{Key: "N", Value: *n})
+	}
+	if alpha != nil {
+		doc = append(doc, bson.E{Key: "alpha", Value: *alpha})
+	}
+	return Accumulator{doc: bson.D{{Key: "$expMovingAvg", Value: doc}}}
 }
 
 // --- $first ---
@@ -179,18 +168,13 @@ func FirstNAccumulator[T Expr, U NumberTypes](input T, n U) Accumulator {
 // --- $integral ---
 
 // IntegralAccumulator returns the approximation of the area under a curve ($integral).
-func IntegralAccumulator[T Expr](input T) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$integral", Value: bson.D{
-		{Key: "input", Value: input},
-	}}}}
-}
-
-// IntegralUnitAccumulator returns the approximation of the area under a curve with a time unit ($integral).
-func IntegralUnitAccumulator[T Expr](input T, unit string) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$integral", Value: bson.D{
-		{Key: "input", Value: input},
-		{Key: "unit", Value: unit},
-	}}}}
+// Pass a non-nil unit to specify a time unit (e.g. "week").
+func IntegralAccumulator[T Expr](input T, unit *string) Accumulator {
+	doc := bson.D{{Key: "input", Value: input}}
+	if unit != nil {
+		doc = append(doc, bson.E{Key: "unit", Value: *unit})
+	}
+	return Accumulator{doc: bson.D{{Key: "$integral", Value: doc}}}
 }
 
 // --- $last ---
@@ -203,7 +187,7 @@ func LastAccumulator[T Expr](expr T) Accumulator {
 // --- $lastN ---
 
 // LastNAccumulator returns the last n elements of input across documents in the group ($lastN).
-func LastNAccumulator[T ArrayTypes, U NumberTypes](input T, n U) Accumulator {
+func LastNAccumulator[T Expr, U NumberTypes](input T, n U) Accumulator {
 	return Accumulator{
 		doc: bson.D{{Key: "$lastN", Value: bson.D{
 			{Key: "input", Value: input},
@@ -236,7 +220,7 @@ func MaxAccumulator[T Expr](expr T) Accumulator {
 // --- $maxN ---
 
 // MaxNAccumulator returns the n largest values in an array ($maxN).
-func MaxNAccumulator[T ArrayTypes, U NumberTypes](input T, n U) Accumulator {
+func MaxNAccumulator[T Expr, U NumberTypes](input T, n U) Accumulator {
 	return Accumulator{doc: bson.D{{Key: "$maxN", Value: bson.D{
 		{Key: "input", Value: input},
 		{Key: "n", Value: n},
@@ -288,7 +272,7 @@ func MinMaxScalerRangeAccumulator[T NumberTypes, U Number](input T, min, max U) 
 // --- $minN ---
 
 // MinNAccumulator returns the n smallest values in an array ($minN).
-func MinNAccumulator[T ArrayTypes, U NumberTypes](input T, n U) Accumulator {
+func MinNAccumulator[T Expr, U NumberTypes](input T, n U) Accumulator {
 	return Accumulator{doc: bson.D{{Key: "$minN", Value: bson.D{
 		{Key: "input", Value: input},
 		{Key: "n", Value: n},
@@ -305,7 +289,8 @@ func PercentileAccumulator[T NumberTypes, U ArrayTypes | []float32 | []float64](
 		doc: bson.D{{Key: "$percentile", Value: bson.D{
 			{Key: "input", Value: input},
 			{Key: "p", Value: p},
-			// TODO: Currently the method must always be "approximate". Do we need an argument for that?
+			// Currently the method must always be "approximate". If this changes, we need to
+			// add an argument for this.
 			{Key: "method", Value: "approximate"},
 		}}},
 	}
@@ -327,32 +312,24 @@ func RankAccumulator() Accumulator {
 
 // --- $setUnion ---
 
-// SetUnionAccumulator takes two or more arrays and returns an array containing the elements that appear in any input array ($setUnion).
-func SetUnionAccumulator[T ArrayTypes](arrays ...T) Accumulator {
-	vals := make(bson.A, len(arrays))
-	for i, a := range arrays {
-		vals[i] = a
-	}
-	return Accumulator{doc: bson.D{{Key: "$setUnion", Value: vals}}}
+// SetUnionAccumulator returns an array of unique values from the given array field across all documents in the group ($setUnion).
+func SetUnionAccumulator[T ArrayTypes](expr T) Accumulator {
+	return Accumulator{doc: bson.D{{Key: "$setUnion", Value: expr}}}
 }
 
 // --- $shift ---
 
 // ShiftAccumulator returns the value from a document in a specified position relative to the current document ($shift).
-func ShiftAccumulator[T Expr](output T, by int32) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$shift", Value: bson.D{
+// Pass a non-nil defaultExpr to specify a value for out-of-bounds positions; it must evaluate to a constant.
+func ShiftAccumulator[T Expr](output T, by int32, defaultExpr any) Accumulator {
+	doc := bson.D{
 		{Key: "output", Value: output},
 		{Key: "by", Value: by},
-	}}}}
-}
-
-// ShiftDefaultAccumulator returns the value from a relative-position document, with a default for out-of-bounds positions ($shift).
-func ShiftDefaultAccumulator[T, D Expr](output T, by int32, defaultExpr D) Accumulator {
-	return Accumulator{doc: bson.D{{Key: "$shift", Value: bson.D{
-		{Key: "output", Value: output},
-		{Key: "by", Value: by},
-		{Key: "default", Value: defaultExpr},
-	}}}}
+	}
+	if defaultExpr != nil {
+		doc = append(doc, bson.E{Key: "default", Value: defaultExpr})
+	}
+	return Accumulator{doc: bson.D{{Key: "$shift", Value: doc}}}
 }
 
 // --- $stdDevPop ---

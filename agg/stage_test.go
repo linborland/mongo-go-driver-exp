@@ -47,6 +47,9 @@ func TestSortStage_AscendingDescendingSort(t *testing.T) {
 	)
 }
 
+// TODO: implement TestSortStage_TextScoreMetadataSort
+// after $meta sort modifier and $text query operator are implemented
+
 // --- $set ---
 
 func TestSetStage_AddingFieldsToEmbeddedDoc(t *testing.T) {
@@ -74,6 +77,15 @@ func TestSetStage_OverwriteExistingField(t *testing.T) {
 		},
 	)
 }
+
+// TODO: implement TestSetStage_UsingTwoSetStages
+// after $sum expression operator is implemented
+
+// TODO: implement TestSetStage_AddElementToArray
+// after $concatArrays expression operator is implemented
+
+// TODO: implement TestSetStage_CreatingNewFieldWithExistingFields
+// after $avg expression operator is implemented
 
 // --- $project ---
 
@@ -193,6 +205,15 @@ func TestProjectStage_IncludeComputedFields(t *testing.T) {
 	)
 }
 
+// TODO: implement TestProjectStage_ConditionallyExcludeFields
+// after $cond operator is implemented
+
+// TODO: implement TestProjectStage_IncludeComputedFieldsSubstr
+// after $substr operator is implemented
+
+// TODO: implement TestProjectStage_ProjectNewArrayFields
+// after array-literal ProjectionField variant is implemented
+
 // --- $match ---
 
 func TestMatchStage_EqualityMatch(t *testing.T) {
@@ -211,6 +232,9 @@ func TestMatchStage_EqualityMatch(t *testing.T) {
 		},
 	)
 }
+
+// TODO: implement TestMatchStage_PerformCount
+// after multi-condition field queries are supported in the query package
 
 // --- $group ---
 
@@ -348,3 +372,18 @@ func TestGroupStage_GroupTitlesByYear(t *testing.T) {
 		},
 	)
 }
+
+// TODO: implement TestGroupStage_RetrieveDistinctValues
+// spec test is $group with _id only and no accumulator fields; ready to implement
+
+// TODO: implement TestGroupStage_GroupByItemHaving
+// ready to implement; uses SumAccumulator(Multiply(...)) followed by MatchStage
+
+// TODO: implement TestGroupStage_CalculateCountSumAvgWithDates
+// after $dateToString expression operator is implemented
+
+// TODO: implement TestGroupStage_GroupByNullSumMultiply
+// ready to implement; existing TestGroupStage_GroupByNull incorrectly duplicates TestGroupStage_CalculateCountSumAvg
+
+// TODO: implement TestGroupStage_GroupDocumentsByAuthor
+// after $addFields stage is implemented
