@@ -376,5 +376,24 @@ func TestGroupStage_GroupTitlesByYear(t *testing.T) {
 // TODO: implement TestGroupStage_GroupByNullSumMultiply
 // ready to implement; existing TestGroupStage_GroupByNull incorrectly duplicates TestGroupStage_CalculateCountSumAvg
 
-// TODO: implement TestGroupStage_GroupDocumentsByAuthor
-// after $addFields stage is implemented
+func TestGroupStage_GroupDocumentsByAuthor(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			"$author",
+			agg.Accumulate("books", agg.PushAccumulator("$$ROOT")),
+		),
+		agg.AddFieldsStage(
+			agg.Assign("totalCopies", agg.Sum("$books.copies")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$author"},
+			{Key: "books", Value: bson.D{{Key: "$push", Value: "$$ROOT"}}},
+		}}},
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "totalCopies", Value: bson.D{{Key: "$sum", Value: bson.A{"$books.copies"}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}

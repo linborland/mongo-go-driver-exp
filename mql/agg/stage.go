@@ -209,3 +209,16 @@ func GroupStage(_id Expr, fields ...GroupField) Stage {
 func LimitStage(limit int32) Stage {
 	return Stage{{Key: "$limit", Value: limit}}
 }
+
+// --- $addFields ---
+
+// AddFieldsStage produces an $addFields stage that adds or overwrites the given fields.
+// It is an alias for $set. Construct via Assign.
+func AddFieldsStage(fields ...SetField) Stage {
+	doc := make(bson.D, len(fields))
+	for i, f := range fields {
+		sf := f.setField()
+		doc[i] = bson.E{Key: sf.name, Value: sf.expr}
+	}
+	return Stage{{Key: "$addFields", Value: doc}}
+}
