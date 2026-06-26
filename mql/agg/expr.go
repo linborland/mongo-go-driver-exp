@@ -10,19 +10,19 @@ type Number interface {
 		~float32 | ~float64
 }
 
-type ArrayTypes interface {
+type ArrayResolver interface {
 	AnyExpr | ArrayExpr | string
 }
 
-type NumberTypes interface {
+type NumberResolver interface {
 	AnyExpr | NumberExpr | Number | string
 }
 
-type StringTypes interface {
+type StringResolver interface {
 	AnyExpr | StringExpr | string
 }
 
-type BoolTypes interface {
+type BoolResolver interface {
 	AnyExpr | BoolExpr | bool
 }
 
