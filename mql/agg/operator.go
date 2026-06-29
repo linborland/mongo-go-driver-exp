@@ -151,7 +151,7 @@ func Exp[T NumberResolver](exponent T) NumberExpr {
 
 // FilterArray selects elements of input for which cond evaluates to true ($filter).
 // as names the variable for each element; pass "" to use the MongoDB default ("this").
-func FilterArray[T ArrayResolver, U BoolResolver](input T, cond U, as string, limit ...NumberExpr) ArrayExpr {
+func FilterArray[T ArrayResolver, U BoolResolver](input T, as string, cond U, limit ...Expr) ArrayExpr {
 	args := bson.D{
 		{Key: "input", Value: input},
 		{Key: "cond", Value: cond},
