@@ -125,13 +125,13 @@ func DenseRankAccumulator() Accumulator {
 
 // --- $derivative ---
 
-type DerivativeOptions struct {
+type DerivativeAccumulatorOptions struct {
 	Unit string
 }
 
 // DerivativeAccumulator returns the average rate of change within the specified window ($derivative).
 // Set opts.Unit to a time unit (e.g. "week") when the sortBy field is a date.
-func DerivativeAccumulator(input Expr, opts *DerivativeOptions) Accumulator {
+func DerivativeAccumulator(input Expr, opts *DerivativeAccumulatorOptions) Accumulator {
 	doc := bson.D{{Key: "input", Value: input}}
 	if opts != nil && opts.Unit != "" {
 		doc = append(doc, bson.E{Key: "unit", Value: opts.Unit})
@@ -148,7 +148,7 @@ func DocumentNumberAccumulator() Accumulator {
 
 // --- $expMovingAvg ---
 
-type ExpMovingAvgOptions struct {
+type ExpMovingAvgAccumulatorOptions struct {
 	N     *int32
 	Alpha *float64
 }
@@ -156,7 +156,7 @@ type ExpMovingAvgOptions struct {
 // ExpMovingAvgAccumulator returns the exponential moving average of the input expression ($expMovingAvg).
 // Set opts.N to a historical document count, or opts.Alpha to an exponential decay value.
 // Exactly one of N or Alpha must be set.
-func ExpMovingAvgAccumulator[T NumberTypes](input T, opts *ExpMovingAvgOptions) Accumulator {
+func ExpMovingAvgAccumulator[T NumberTypes](input T, opts *ExpMovingAvgAccumulatorOptions) Accumulator {
 	doc := bson.D{{Key: "input", Value: input}}
 	if opts != nil && opts.N != nil {
 		doc = append(doc, bson.E{Key: "N", Value: *opts.N})
@@ -186,13 +186,13 @@ func FirstNAccumulator[T NumberTypes](input Expr, n T) Accumulator {
 
 // --- $integral ---
 
-type IntegralOptions struct {
+type IntegralAccumulatorOptions struct {
 	Unit string
 }
 
 // IntegralAccumulator returns the approximation of the area under a curve ($integral).
 // Set opts.Unit to a time unit (e.g. "week") when the sortBy field is a date.
-func IntegralAccumulator(input Expr, opts *IntegralOptions) Accumulator {
+func IntegralAccumulator(input Expr, opts *IntegralAccumulatorOptions) Accumulator {
 	doc := bson.D{{Key: "input", Value: input}}
 	if opts != nil && opts.Unit != "" {
 		doc = append(doc, bson.E{Key: "unit", Value: opts.Unit})
