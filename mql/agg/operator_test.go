@@ -26,9 +26,43 @@ func TestAbs(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestAcos when $addFields is implemented
+func TestAcos(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("angle_a", agg.RadiansToDegrees(agg.Acos(agg.Divide("$side_b", "$hypotenuse")))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "angle_a", Value: bson.D{
+				{Key: "$radiansToDegrees", Value: bson.D{
+					{Key: "$acos", Value: bson.D{
+						{Key: "$divide", Value: bson.A{"$side_b", "$hypotenuse"}},
+					}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestAcosh when $addFields is implemented
+func TestAcosh(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("y-coordinate", agg.RadiansToDegrees(agg.Acosh("$x-coordinate"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "y-coordinate", Value: bson.D{
+				{Key: "$radiansToDegrees", Value: bson.D{
+					{Key: "$acosh", Value: "$x-coordinate"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestAdd_AddNumbers(t *testing.T) {
 	got := agg.Pipeline{
@@ -94,15 +128,99 @@ func TestArrayToObject_Example(t *testing.T) {
 // TODO: implement TestArrayToObject_ObjectToArray when ObjectToArray
 // operator is implemented
 
-// TODO: implement TestAsin when $addFields is implemented
+func TestAsin(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("angle_a", agg.RadiansToDegrees(agg.Asin(agg.Divide("$side_a", "$hypotenuse")))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "angle_a", Value: bson.D{
+				{Key: "$radiansToDegrees", Value: bson.D{
+					{Key: "$asin", Value: bson.D{
+						{Key: "$divide", Value: bson.A{"$side_a", "$hypotenuse"}},
+					}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestAsinh when $addFields is implemented
+func TestAsinh(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("y-coordinate", agg.RadiansToDegrees(agg.Asinh("$x-coordinate"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "y-coordinate", Value: bson.D{
+				{Key: "$radiansToDegrees", Value: bson.D{
+					{Key: "$asinh", Value: "$x-coordinate"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestAtan when $addFields is implemented
+func TestAtan(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("angle_a", agg.RadiansToDegrees(agg.Atan(agg.Divide("$side_b", "$side_a")))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "angle_a", Value: bson.D{
+				{Key: "$radiansToDegrees", Value: bson.D{
+					{Key: "$atan", Value: bson.D{
+						{Key: "$divide", Value: bson.A{"$side_b", "$side_a"}},
+					}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestAtan2 when $addFields is implemented
+func TestAtan2(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("angle_a", agg.RadiansToDegrees(agg.Atan2("$side_b", "$side_a"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "angle_a", Value: bson.D{
+				{Key: "$radiansToDegrees", Value: bson.D{
+					{Key: "$atan2", Value: bson.A{"$side_b", "$side_a"}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestAtanh when $addFields is implemented
+func TestAtanh(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("y-coordinate", agg.RadiansToDegrees(agg.Atanh("$x-coordinate"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "y-coordinate", Value: bson.D{
+				{Key: "$radiansToDegrees", Value: bson.D{
+					{Key: "$atanh", Value: "$x-coordinate"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestAvg(t *testing.T) {
 	got := agg.Pipeline{
@@ -218,9 +336,44 @@ func TestBitXor(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestCos when $addFields is implemented
+func TestCos(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("side_a", agg.Multiply(agg.Cos(agg.DegreesToRadians("$angle_a")), "$hypotenuse")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "side_a", Value: bson.D{
+				{Key: "$multiply", Value: bson.A{
+					bson.D{{Key: "$cos", Value: bson.D{
+						{Key: "$degreesToRadians", Value: "$angle_a"},
+					}}},
+					"$hypotenuse",
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestCosh when $addFields is implemented
+func TestCosh(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("cosh_output", agg.Cosh(agg.DegreesToRadians("$angle"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "cosh_output", Value: bson.D{
+				{Key: "$cosh", Value: bson.D{
+					{Key: "$degreesToRadians", Value: "$angle"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestCeil(t *testing.T) {
 	got := agg.Pipeline{
@@ -262,7 +415,23 @@ func TestCmp(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestDegreesToRadians when $addFields is implemented
+func TestDegreesToRadians(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("angle_a_rad", agg.DegreesToRadians("$angle_a")),
+			agg.Assign("angle_b_rad", agg.DegreesToRadians("$angle_b")),
+			agg.Assign("angle_c_rad", agg.DegreesToRadians("$angle_c")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "angle_a_rad", Value: bson.D{{Key: "$degreesToRadians", Value: "$angle_a"}}},
+			{Key: "angle_b_rad", Value: bson.D{{Key: "$degreesToRadians", Value: "$angle_b"}}},
+			{Key: "angle_c_rad", Value: bson.D{{Key: "$degreesToRadians", Value: "$angle_c"}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestDivide(t *testing.T) {
 	got := agg.Pipeline{
@@ -785,7 +954,23 @@ func TestPow(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestRadiansToDegrees when $addFields is implemented
+func TestRadiansToDegrees(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("angle_a_deg", agg.RadiansToDegrees("$angle_a")),
+			agg.Assign("angle_b_deg", agg.RadiansToDegrees("$angle_b")),
+			agg.Assign("angle_c_deg", agg.RadiansToDegrees("$angle_c")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "angle_a_deg", Value: bson.D{{Key: "$radiansToDegrees", Value: "$angle_a"}}},
+			{Key: "angle_b_deg", Value: bson.D{{Key: "$radiansToDegrees", Value: "$angle_b"}}},
+			{Key: "angle_c_deg", Value: bson.D{{Key: "$radiansToDegrees", Value: "$angle_c"}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestRound(t *testing.T) {
 	got := agg.Pipeline{
@@ -817,9 +1002,44 @@ func TestSigmoid(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSin when $addFields is implemented
+func TestSin(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("side_b", agg.Multiply(agg.Sin(agg.DegreesToRadians("$angle_a")), "$hypotenuse")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "side_b", Value: bson.D{
+				{Key: "$multiply", Value: bson.A{
+					bson.D{{Key: "$sin", Value: bson.D{
+						{Key: "$degreesToRadians", Value: "$angle_a"},
+					}}},
+					"$hypotenuse",
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestSinh when $addFields is implemented
+func TestSinh(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("sinh_output", agg.Sinh(agg.DegreesToRadians("$angle"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "sinh_output", Value: bson.D{
+				{Key: "$sinh", Value: bson.D{
+					{Key: "$degreesToRadians", Value: "$angle"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestSqrt(t *testing.T) {
 	got := agg.Pipeline{
@@ -910,9 +1130,44 @@ func TestSum(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestTan when $addFields is implemented
+func TestTan(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("side_b", agg.Multiply(agg.Tan(agg.DegreesToRadians("$angle_a")), "$side_a")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "side_b", Value: bson.D{
+				{Key: "$multiply", Value: bson.A{
+					bson.D{{Key: "$tan", Value: bson.D{
+						{Key: "$degreesToRadians", Value: "$angle_a"},
+					}}},
+					"$side_a",
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestTanh when $addFields is implemented
+func TestTanh(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("tanh_output", agg.Tanh(agg.DegreesToRadians("$angle"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "tanh_output", Value: bson.D{
+				{Key: "$tanh", Value: bson.D{
+					{Key: "$degreesToRadians", Value: "$angle"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestConcat(t *testing.T) {
 	got := agg.Pipeline{
