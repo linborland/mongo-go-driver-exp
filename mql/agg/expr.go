@@ -26,6 +26,10 @@ type BoolResolver interface {
 	AnyExpr | BoolExpr | bool
 }
 
+type ObjectResolver interface {
+	AnyExpr | ObjectExpr | string | bson.D | bson.M
+}
+
 type Expr any
 
 type Option[T any] func(*T)
