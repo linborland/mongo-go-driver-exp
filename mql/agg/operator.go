@@ -288,7 +288,39 @@ func IndexOfArray[T ArrayResolver](array T, search Expr, start Expr, end Expr) N
 			args = append(args, end)
 		}
 	}
-	return NumberExpr{expr: bson.D{{Key: "$indexOfArray", Value: args}}}
+  return NumberExpr{expr: bson.D{{Key: "$indexOfArray", Value: args}}}
+}
+
+// IndexOfBytes searches a string for a substring and returns the UTF-8 byte index of the first occurrence, or -1 if not found ($indexOfBytes).
+// start and end are optional starting and ending index positions; pass nil to omit. If only end is set, start defaults to 0.
+func IndexOfBytes[T StringResolver, U StringResolver](str T, substring U, start, end Expr) NumberExpr {
+	args := bson.A{str, substring}
+  if start != nil || end != nil {
+		if start == nil {
+			start = 0
+		}
+		args = append(args, start)
+		if end != nil {
+			args = append(args, end)
+		}
+	}  
+	return NumberExpr{expr: bson.D{{Key: "$indexOfBytes", Value: args}}}
+}
+
+// IndexOfCP searches a string for a substring and returns the UTF-8 code point index of the first occurrence, or -1 if not found ($indexOfCP).
+// start and end are optional starting and ending index positions; pass nil to omit. If only end is set, start defaults to 0.
+func IndexOfCP[T StringResolver, U StringResolver](str T, substring U, start, end Expr) NumberExpr {
+	args := bson.A{str, substring}
+	if start != nil || end != nil {
+		if start == nil {
+			start = 0
+		}
+		args = append(args, start)
+		if end != nil {
+			args = append(args, end)
+		}
+	}
+	return NumberExpr{expr: bson.D{{Key: "$indexOfCP", Value: args}}}
 }
 
 // Last returns the last element of the array expression ($last).
@@ -331,6 +363,16 @@ func Lt(a Expr, b Expr) BoolExpr {
 // Lte returns true if a is less than or equal to b ($lte).
 func Lte(a Expr, b Expr) BoolExpr {
 	return BoolExpr{expr: bson.D{{Key: "$lte", Value: bson.A{a, b}}}}
+}
+
+// Ltrim removes whitespace or the specified characters from the beginning of a string ($ltrim).
+// chars is optional; pass nil to remove whitespace.
+func Ltrim[T StringResolver](input T, chars Expr) StringExpr {
+	args := bson.D{{Key: "input", Value: input}}
+	if chars != nil {
+		args = append(args, bson.E{Key: "chars", Value: chars})
+	}
+	return StringExpr{expr: bson.D{{Key: "$ltrim", Value: args}}}
 }
 
 // Max returns the maximum value among the given expressions ($max).
@@ -419,7 +461,7 @@ func Pow[T NumberResolver, U NumberResolver](number T, exponent U) NumberExpr {
 func RadiansToDegrees[T NumberResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$radiansToDegrees", Value: expr}}}
 }
-
+  
 // Range outputs an array of integers from start (inclusive) to end (exclusive) ($range).
 // An optional step controls the increment; defaults to 1.
 func Range[T NumberResolver, U NumberResolver, S NumberResolver](start T, end U, step *S) ArrayExpr {
@@ -428,6 +470,54 @@ func Range[T NumberResolver, U NumberResolver, S NumberResolver](start T, end U,
 		args = append(args, *step)
 	}
 	return ArrayExpr{expr: bson.D{{Key: "$range", Value: args}}}
+}
+
+// RegexFind applies a regular expression to a string and returns information on the first matched substring ($regexFind).
+// options is optional; pass nil to omit.
+func RegexFind[T StringResolver](input T, regex Expr, options *string) ObjectExpr {
+	args := bson.D{{Key: "input", Value: input}, {Key: "regex", Value: regex}}
+	if options != nil {
+		args = append(args, bson.E{Key: "options", Value: options})
+	}
+	return ObjectExpr{expr: bson.D{{Key: "$regexFind", Value: args}}}
+}
+
+// RegexFindAll applies a regular expression to a string and returns information on all matched substrings ($regexFindAll).
+// options is optional; pass nil to omit.
+func RegexFindAll[T StringResolver](input T, regex Expr, options *string) ArrayExpr {
+	args := bson.D{{Key: "input", Value: input}, {Key: "regex", Value: regex}}
+	if options != nil {
+		args = append(args, bson.E{Key: "options", Value: options})
+	}
+	return ArrayExpr{expr: bson.D{{Key: "$regexFindAll", Value: args}}}
+}
+
+// RegexMatch applies a regular expression to a string and returns true if a match is found ($regexMatch).
+// options is optional; pass nil to omit.
+func RegexMatch[T StringResolver](input T, regex Expr, options *string) BoolExpr {
+	args := bson.D{{Key: "input", Value: input}, {Key: "regex", Value: regex}}
+	if options != nil {
+		args = append(args, bson.E{Key: "options", Value: options})
+	}
+	return BoolExpr{expr: bson.D{{Key: "$regexMatch", Value: args}}}
+}
+
+// ReplaceAll replaces all instances of a search string in an input string with a replacement string ($replaceAll).
+func ReplaceAll[T StringResolver, R StringResolver](input T, find Expr, replacement R) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$replaceAll", Value: bson.D{
+		{Key: "input", Value: input},
+		{Key: "find", Value: find},
+		{Key: "replacement", Value: replacement},
+	}}}}
+}
+
+// ReplaceOne replaces the first instance of a matched string in a given input ($replaceOne).
+func ReplaceOne[T StringResolver, R StringResolver](input T, find Expr, replacement R) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$replaceOne", Value: bson.D{
+		{Key: "input", Value: input},
+		{Key: "find", Value: find},
+		{Key: "replacement", Value: replacement},
+	}}}}
 }
 
 // ReverseArray returns an array with the elements in reverse order ($reverseArray).
@@ -442,6 +532,16 @@ func Round[T NumberResolver](number T, place ...int) NumberExpr {
 		return NumberExpr{expr: bson.D{{Key: "$round", Value: bson.A{number}}}}
 	}
 	return NumberExpr{expr: bson.D{{Key: "$round", Value: bson.A{number, place[0]}}}}
+}
+
+// Rtrim removes whitespace characters or the specified characters from the end of a string ($rtrim).
+// chars is optional; pass nil to remove whitespace.
+func Rtrim[T StringResolver](input T, chars Expr) StringExpr {
+	args := bson.D{{Key: "input", Value: input}}
+	if chars != nil {
+		args = append(args, bson.E{Key: "chars", Value: chars})
+	}
+	return StringExpr{expr: bson.D{{Key: "$rtrim", Value: args}}}
 }
 
 // SetDifference returns elements in the first set but not the second ($setDifference).
@@ -495,12 +595,12 @@ func Sin[T NumberResolver](expr T) NumberExpr {
 func Sinh[T NumberResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$sinh", Value: expr}}}
 }
-
+  
 // Size returns the number of elements in the array ($size).
 func Size[T ArrayResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$size", Value: expr}}}
 }
-
+  
 // Slice returns n elements of an array ($slice).
 // Pass a non-nil start to specify a starting index; otherwise elements are taken from the beginning.
 func Slice[T ArrayResolver](expression T, n Expr, start Expr) ArrayExpr {
@@ -508,6 +608,11 @@ func Slice[T ArrayResolver](expression T, n Expr, start Expr) ArrayExpr {
 		return ArrayExpr{expr: bson.D{{Key: "$slice", Value: bson.A{expression, start, n}}}}
 	}
 	return ArrayExpr{expr: bson.D{{Key: "$slice", Value: bson.A{expression, n}}}}
+}
+
+// Split splits a string into substrings based on a delimiter and returns an array of substrings ($split).
+func Split[T StringResolver](str T, delimiter Expr) ArrayExpr {
+	return ArrayExpr{expr: bson.D{{Key: "$split", Value: bson.A{str, delimiter}}}}
 }
 
 // SortArray sorts the elements of an array by the specified document fields ($sortArray).
@@ -548,6 +653,36 @@ func StdDevSamp(exprs ...Expr) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$stdDevSamp", Value: exprs}}}
 }
 
+// Strcasecmp performs case-insensitive string comparison and returns 0 if equivalent, 1 if the first is greater, and -1 if less ($strcasecmp).
+func Strcasecmp[T StringResolver, U StringResolver](expr1 T, expr2 U) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$strcasecmp", Value: bson.A{expr1, expr2}}}}
+}
+
+// StrLenBytes returns the number of UTF-8 encoded bytes in a string ($strLenBytes).
+func StrLenBytes[T StringResolver](expr T) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$strLenBytes", Value: expr}}}
+}
+
+// StrLenCP returns the number of UTF-8 code points in a string ($strLenCP).
+func StrLenCP[T StringResolver](expr T) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$strLenCP", Value: expr}}}
+}
+
+// Substr returns a substring of a string. Deprecated; use SubstrBytes or SubstrCP ($substr).
+func Substr[T StringResolver, U NumberResolver, V NumberResolver](str T, start U, length V) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$substr", Value: bson.A{str, start, length}}}}
+}
+
+// SubstrBytes returns the substring of a string starting at the specified UTF-8 byte index for the specified number of bytes ($substrBytes).
+func SubstrBytes[T StringResolver, U NumberResolver, V NumberResolver](str T, start U, length V) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$substrBytes", Value: bson.A{str, start, length}}}}
+}
+
+// SubstrCP returns the substring of a string starting at the specified UTF-8 code point index for the specified number of code points ($substrCP).
+func SubstrCP[T StringResolver, U NumberResolver, V NumberResolver](str T, start U, length V) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$substrCP", Value: bson.A{str, start, length}}}}
+}
+
 // Subtract returns a minus b ($subtract).
 // TODO: $subtract also supports date-date → millis and date-millis → date;
 // those variants are not yet modeled here.
@@ -570,6 +705,11 @@ func Tanh[T NumberResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$tanh", Value: expr}}}
 }
 
+// ToLower converts a string to lowercase ($toLower).
+func ToLower[T StringResolver](expr T) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$toLower", Value: expr}}}
+}
+  
 // Top returns the top element within an array according to the specified sort order ($top).
 // This is the expression operator (MongoDB 7.0+) that takes an input array.
 // See TopAccumulator for the $group/$setWindowFields accumulator form.
@@ -601,6 +741,21 @@ func TopN[T ArrayResolver](n Expr, input T, output Expr, sortBy ...SortField) Ar
 		{Key: "output", Value: output},
 		{Key: "input", Value: input},
 	}}}}
+}
+
+// ToUpper converts a string to uppercase ($toUpper).
+func ToUpper[T StringResolver](expr T) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$toUpper", Value: expr}}}
+}
+
+// Trim removes whitespace or the specified characters from the beginning and end of a string ($trim).
+// chars is optional; pass nil to remove whitespace.
+func Trim[T StringResolver](input T, chars Expr) StringExpr {
+	args := bson.D{{Key: "input", Value: input}}
+	if chars != nil {
+		args = append(args, bson.E{Key: "chars", Value: chars})
+	}
+	return StringExpr{expr: bson.D{{Key: "$trim", Value: args}}}
 }
 
 // Trunc truncates a number to a whole integer or to a specified decimal place ($trunc).
