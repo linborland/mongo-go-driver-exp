@@ -310,7 +310,8 @@ func WithIndexOfEnd[T NumberResolver](end T) Option[indexOfOptions] {
 }
 
 // IndexOfArray searches an array for a value and returns the index of the first occurrence ($indexOfArray).
-// Optionally provide start and end index bounds via IndexOfOptions.
+// Optionally bound the search via WithIndexOfStart and WithIndexOfEnd; if only the
+// end is given, the start defaults to 0.
 func IndexOfArray[T ArrayResolver](array T, search Expr, opts ...Option[indexOfOptions]) NumberExpr {
 	var o indexOfOptions
 	for _, opt := range opts {
@@ -331,7 +332,8 @@ func IndexOfArray[T ArrayResolver](array T, search Expr, opts ...Option[indexOfO
 }
 
 // IndexOfBytes searches a string for a substring and returns the UTF-8 byte index of the first occurrence, or -1 if not found ($indexOfBytes).
-// start and end are optional starting and ending index positions; pass nil to omit. If only end is set, start defaults to 0.
+// Optionally bound the search via WithIndexOfStart and WithIndexOfEnd; if only the
+// end is given, the start defaults to 0.
 func IndexOfBytes[T StringResolver, U StringResolver](str T, substring U, opts ...Option[indexOfOptions]) NumberExpr {
 	var o indexOfOptions
 	for _, opt := range opts {
@@ -352,7 +354,8 @@ func IndexOfBytes[T StringResolver, U StringResolver](str T, substring U, opts .
 }
 
 // IndexOfCP searches a string for a substring and returns the UTF-8 code point index of the first occurrence, or -1 if not found ($indexOfCP).
-// start and end are optional starting and ending index positions; pass nil to omit. If only end is set, start defaults to 0.
+// Optionally bound the search via WithIndexOfStart and WithIndexOfEnd; if only the
+// end is given, the start defaults to 0.
 func IndexOfCP[T StringResolver, U StringResolver](str T, substring U, opts ...Option[indexOfOptions]) NumberExpr {
 	var o indexOfOptions
 	for _, opt := range opts {
@@ -415,7 +418,7 @@ func Lte(a Expr, b Expr) BoolExpr {
 }
 
 // Ltrim removes whitespace or the specified characters from the beginning of a string ($ltrim).
-// chars is optional; pass nil to remove whitespace.
+// Optionally specify the characters to remove via WithTrimChars; when omitted, whitespace is removed.
 func Ltrim[T StringResolver](input T, opts ...Option[trimOptions]) StringExpr {
 	var o trimOptions
 	for _, opt := range opts {
@@ -550,7 +553,7 @@ func WithRegexOptions(options string) Option[regexOptions] {
 }
 
 // RegexFind applies a regular expression to a string and returns information on the first matched substring ($regexFind).
-// options is optional; pass nil to omit.
+// Optionally set the regex option flags via WithRegexOptions.
 func RegexFind[T StringResolver](input T, regex Expr, opts ...Option[regexOptions]) ObjectExpr {
 	var o regexOptions
 	for _, opt := range opts {
@@ -564,7 +567,7 @@ func RegexFind[T StringResolver](input T, regex Expr, opts ...Option[regexOption
 }
 
 // RegexFindAll applies a regular expression to a string and returns information on all matched substrings ($regexFindAll).
-// options is optional; pass nil to omit.
+// Optionally set the regex option flags via WithRegexOptions.
 func RegexFindAll[T StringResolver](input T, regex Expr, opts ...Option[regexOptions]) ArrayExpr {
 	var o regexOptions
 	for _, opt := range opts {
@@ -578,7 +581,7 @@ func RegexFindAll[T StringResolver](input T, regex Expr, opts ...Option[regexOpt
 }
 
 // RegexMatch applies a regular expression to a string and returns true if a match is found ($regexMatch).
-// options is optional; pass nil to omit.
+// Optionally set the regex option flags via WithRegexOptions.
 func RegexMatch[T StringResolver](input T, regex Expr, opts ...Option[regexOptions]) BoolExpr {
 	var o regexOptions
 	for _, opt := range opts {
@@ -640,7 +643,7 @@ func Round[T NumberResolver](number T, opts ...Option[roundOptions]) NumberExpr 
 }
 
 // Rtrim removes whitespace characters or the specified characters from the end of a string ($rtrim).
-// chars is optional; pass nil to remove whitespace.
+// Optionally specify the characters to remove via WithTrimChars; when omitted, whitespace is removed.
 func Rtrim[T StringResolver](input T, opts ...Option[trimOptions]) StringExpr {
 	var o trimOptions
 	for _, opt := range opts {
@@ -883,7 +886,7 @@ func WithTrimChars[T StringResolver](chars T) Option[trimOptions] {
 }
 
 // Trim removes whitespace or the specified characters from the beginning and end of a string ($trim).
-// chars is optional; pass nil to remove whitespace.
+// Optionally specify the characters to remove via WithTrimChars; when omitted, whitespace is removed.
 func Trim[T StringResolver](input T, opts ...Option[trimOptions]) StringExpr {
 	var o trimOptions
 	for _, opt := range opts {
