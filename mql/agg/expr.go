@@ -28,11 +28,11 @@ type BoolResolver interface {
 
 type Expr any
 
+type Option[T any] func(*T)
+
 type AnyExpr struct {
 	expr Expr
 }
-
-type Option[T any] func(*T)
 
 func (ae AnyExpr) MarshalBSONValue() (byte, []byte, error) {
 	if ae.expr == nil {
