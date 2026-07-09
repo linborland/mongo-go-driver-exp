@@ -28,6 +28,8 @@ type BoolResolver interface {
 
 type Expr any
 
+type Option[T any] func(*T)
+
 type AnyExpr struct {
 	expr Expr
 }
