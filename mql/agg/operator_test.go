@@ -581,10 +581,9 @@ func TestConcatArrays(t *testing.T) {
 // TODO: implement TestConvert_Example when $switch is implemented
 
 func TestConvert_ConvertHexadecimalStringToInteger(t *testing.T) {
-	base := int32(16)
 	got := agg.Pipeline{
 		agg.ProjectStage(
-			agg.Compute("decimalValue", agg.Convert("$hexString", "int", nil, nil, &base)),
+			agg.Compute("decimalValue", agg.Convert("$hexString", "int", agg.WithConvertBase(16))),
 		),
 	}
 	want := bson.A{
@@ -600,10 +599,9 @@ func TestConvert_ConvertHexadecimalStringToInteger(t *testing.T) {
 }
 
 func TestConvert_ConvertIntegerToBinaryString(t *testing.T) {
-	base := int32(2)
 	got := agg.Pipeline{
 		agg.ProjectStage(
-			agg.Compute("binaryString", agg.Convert("$value", "string", nil, nil, &base)),
+			agg.Compute("binaryString", agg.Convert("$value", "string", agg.WithConvertBase(2))),
 		),
 	}
 	want := bson.A{
@@ -622,7 +620,7 @@ func TestConvert_OnErrorReturnsFallbackString(t *testing.T) {
 	got := agg.Pipeline{
 		agg.AddFieldsStage(
 			agg.Assign("convertedQty", agg.Convert("$qty", "int",
-				agg.ToString("$qty"), nil, nil)),
+				agg.WithConvertOnError(agg.ToString("$qty")))),
 		),
 	}
 	want := bson.A{
@@ -644,7 +642,7 @@ func TestConvert_OnNullReturnsFallbackDecimal(t *testing.T) {
 	}
 	got := agg.Pipeline{
 		agg.AddFieldsStage(
-			agg.Assign("convertedPrice", agg.Convert("$price", "decimal", "Error", onNull, nil)),
+			agg.Assign("convertedPrice", agg.Convert("$price", "decimal", agg.WithConvertOnError("Error"), agg.WithConvertOnNull(onNull))),
 		),
 	}
 	want := bson.A{

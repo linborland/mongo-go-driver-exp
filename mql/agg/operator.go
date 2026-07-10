@@ -189,25 +189,52 @@ func ConcatArrays[T ArrayResolver, U ArrayResolver](array T, arrays ...U) ArrayE
 	return ArrayExpr{expr: bson.D{{Key: "$concatArrays", Value: v}}}
 }
 
+type convertOptions struct {
+	onError any
+	onNull  any
+	base    any
+}
+
+func WithConvertOnError(onError Expr) Option[convertOptions] {
+	return func(o *convertOptions) {
+		o.onError = onError
+	}
+}
+
+func WithConvertOnNull(onNull Expr) Option[convertOptions] {
+	return func(o *convertOptions) {
+		o.onNull = onNull
+	}
+}
+
+func WithConvertBase(base int32) Option[convertOptions] {
+	return func(o *convertOptions) {
+		o.base = base
+	}
+}
+
 // Convert converts the input value to the type named by to ($convert).
-// to must resolve to a string type name or numeric type code.
-// onError (returned on a conversion error) and onNull (returned when the input
-// is null or missing) may be nil to omit them. base is the numeric base
-// (2, 8, 10, or 16) used when converting between strings and integers; pass nil
-// to use the default of base 10 (MongoDB 8.3+).
-func Convert[T StringResolver | NumberResolver](input Expr, to T, onError Expr, onNull Expr, base *int32) AnyExpr {
+// to must resolve to a string type name or numeric type code. Optionally provide a value
+// returned on a conversion error via WithConvertOnError, a value returned when the input is
+// null or missing via WithConvertOnNull, and the numeric base (2, 8, 10, or 16) used when
+// converting between strings and integers via WithConvertBase; base defaults to 10 (MongoDB 8.3+).
+func Convert[T StringResolver | NumberResolver](input Expr, to T, opts ...Option[convertOptions]) AnyExpr {
+	var o convertOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	doc := bson.D{
 		{Key: "input", Value: input},
 		{Key: "to", Value: to},
 	}
-	if onError != nil {
-		doc = append(doc, bson.E{Key: "onError", Value: onError})
+	if o.onError != nil {
+		doc = append(doc, bson.E{Key: "onError", Value: o.onError})
 	}
-	if onNull != nil {
-		doc = append(doc, bson.E{Key: "onNull", Value: onNull})
+	if o.onNull != nil {
+		doc = append(doc, bson.E{Key: "onNull", Value: o.onNull})
 	}
-	if base != nil {
-		doc = append(doc, bson.E{Key: "base", Value: *base})
+	if o.base != nil {
+		doc = append(doc, bson.E{Key: "base", Value: o.base})
 	}
 	return AnyExpr{expr: bson.D{{Key: "$convert", Value: doc}}}
 }
@@ -300,13 +327,27 @@ func Floor[T NumberResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$floor", Value: expr}}}
 }
 
+type getFieldOptions struct {
+	input any
+}
+
+func WithGetFieldInput(input Expr) Option[getFieldOptions] {
+	return func(o *getFieldOptions) {
+		o.input = input
+	}
+}
+
 // GetField returns the value of the specified field from a document ($getField).
-// field must resolve to a string constant. input is the document to read from;
-// pass nil to default to the document currently being processed ($$CURRENT).
-func GetField[T StringResolver](field T, input Expr) AnyExpr {
+// field must resolve to a string constant. Optionally provide the document to read from via
+// WithGetFieldInput; it defaults to the document currently being processed ($$CURRENT).
+func GetField[T StringResolver](field T, opts ...Option[getFieldOptions]) AnyExpr {
+	var o getFieldOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	doc := bson.D{{Key: "field", Value: field}}
-	if input != nil {
-		doc = append(doc, bson.E{Key: "input", Value: input})
+	if o.input != nil {
+		doc = append(doc, bson.E{Key: "input", Value: o.input})
 	}
 	return AnyExpr{expr: bson.D{{Key: "$getField", Value: doc}}}
 }
