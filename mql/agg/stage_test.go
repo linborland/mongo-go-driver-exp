@@ -380,7 +380,7 @@ func TestGroupStage_GroupDocumentsByAuthor(t *testing.T) {
 	got := agg.Pipeline{
 		agg.GroupStage(
 			"$author",
-			agg.Accumulate("books", agg.PushAccumulator("$$ROOT")),
+			agg.Accumulate("books", agg.PushAccumulator(agg.RootObject())),
 		),
 		agg.AddFieldsStage(
 			agg.Assign("totalCopies", agg.Sum("$books.copies")),

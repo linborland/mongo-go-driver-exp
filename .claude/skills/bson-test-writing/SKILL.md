@@ -63,7 +63,7 @@ func TestGroupStage_CountNumDocsInColl(t *testing.T) {
 Rules:
 - The first argument to `assertPipelineEqual` is the **Go builder call** (use `agg.XxxStage(...)`, `agg.Accumulate(...)`, etc.)
 - The second argument is the **expected BSON** (`bson.A` of `bson.D` stages) — transcribe directly from the spec's pipeline JSON
-- Field references like `"$fieldname"` or `"$$ROOT"` are plain Go string literals
+- Field references like `"$fieldname"` are plain Go string literals
 - `null` / `~` in YAML → `nil` in Go BSON
 - Numeric literals: use untyped Go literals (`1`, `100`) — let the compiler infer
 - If a spec test includes stages that aren't yet implemented, add a `// TODO: requires $xxx` comment and skip that stage in the pipeline (or skip the whole test if it's the primary stage under test)
