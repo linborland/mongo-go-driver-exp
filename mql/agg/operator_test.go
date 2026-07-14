@@ -2,6 +2,7 @@ package agg_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mongodb-labs/mongo-go-driver-exp/mql/agg"
 	"github.com/mongodb-labs/mongo-go-driver-exp/mql/query"
@@ -697,6 +698,707 @@ func TestCosh(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
+// TODO: add $merge stage when implemented
+func TestDateAdd_AddFutureDate(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("expectedDeliveryDate", agg.DateAdd("$purchaseDate", "day", 3)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "expectedDeliveryDate", Value: bson.D{
+				{Key: "$dateAdd", Value: bson.D{
+					{Key: "startDate", Value: "$purchaseDate"},
+					{Key: "unit", Value: "day"},
+					{Key: "amount", Value: 3},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+// TODO: implement TestDateAdd_FilterOnDateRange when $expr is implemented
+
+func TestDateAdd_AdjustForDaylightSavingsTime(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Include("location"),
+			agg.Compute("start", agg.DateToString("$login", agg.WithDateToStringFormat("%Y-%m-%d %H:%M"))),
+			agg.Compute("days", agg.DateToString(
+				agg.DateAdd("$login", "day", 1, agg.WithDateAddTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"))),
+			agg.Compute("hours", agg.DateToString(
+				agg.DateAdd("$login", "hour", 24, agg.WithDateAddTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"))),
+			agg.Compute("startTZInfo", agg.DateToString("$login",
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"),
+				agg.WithDateToStringTimezone("$location"))),
+			agg.Compute("daysTZInfo", agg.DateToString(
+				agg.DateAdd("$login", "day", 1, agg.WithDateAddTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"),
+				agg.WithDateToStringTimezone("$location"))),
+			agg.Compute("hoursTZInfo", agg.DateToString(
+				agg.DateAdd("$login", "hour", 24, agg.WithDateAddTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"),
+				agg.WithDateToStringTimezone("$location"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: int32(0)},
+			{Key: "location", Value: int32(1)},
+			{Key: "start", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$login"},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+				}},
+			}},
+			{Key: "days", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateAdd", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "day"},
+							{Key: "amount", Value: 1},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+				}},
+			}},
+			{Key: "hours", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateAdd", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "hour"},
+							{Key: "amount", Value: 24},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+				}},
+			}},
+			{Key: "startTZInfo", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$login"},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+					{Key: "timezone", Value: "$location"},
+				}},
+			}},
+			{Key: "daysTZInfo", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateAdd", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "day"},
+							{Key: "amount", Value: 1},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+					{Key: "timezone", Value: "$location"},
+				}},
+			}},
+			{Key: "hoursTZInfo", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateAdd", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "hour"},
+							{Key: "amount", Value: 24},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+					{Key: "timezone", Value: "$location"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateDiff_ElapsedTime(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			agg.Null,
+			agg.Accumulate("averageTime", agg.AvgAccumulator(agg.DateDiff("$purchased", "$delivered", "day"))),
+		),
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Compute("numDays", agg.Trunc("$averageTime", agg.WithTruncPlace(1))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: nil},
+			{Key: "averageTime", Value: bson.D{
+				{Key: "$avg", Value: bson.D{
+					{Key: "$dateDiff", Value: bson.D{
+						{Key: "startDate", Value: "$purchased"},
+						{Key: "endDate", Value: "$delivered"},
+						{Key: "unit", Value: "day"},
+					}},
+				}},
+			}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: int32(0)},
+			{Key: "numDays", Value: bson.D{
+				{Key: "$trunc", Value: bson.A{"$averageTime", 1}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateDiff_ResultPrecision(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("Start", "$start"),
+			agg.Compute("End", "$end"),
+			agg.Compute("years", agg.DateDiff("$start", "$end", "year")),
+			agg.Compute("months", agg.DateDiff("$start", "$end", "month")),
+			agg.Compute("days", agg.DateDiff("$start", "$end", "day")),
+			agg.Exclude("_id"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "Start", Value: "$start"},
+			{Key: "End", Value: "$end"},
+			{Key: "years", Value: bson.D{
+				{Key: "$dateDiff", Value: bson.D{
+					{Key: "startDate", Value: "$start"},
+					{Key: "endDate", Value: "$end"},
+					{Key: "unit", Value: "year"},
+				}},
+			}},
+			{Key: "months", Value: bson.D{
+				{Key: "$dateDiff", Value: bson.D{
+					{Key: "startDate", Value: "$start"},
+					{Key: "endDate", Value: "$end"},
+					{Key: "unit", Value: "month"},
+				}},
+			}},
+			{Key: "days", Value: bson.D{
+				{Key: "$dateDiff", Value: bson.D{
+					{Key: "startDate", Value: "$start"},
+					{Key: "endDate", Value: "$end"},
+					{Key: "unit", Value: "day"},
+				}},
+			}},
+			{Key: "_id", Value: int32(0)},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateDiff_WeeksPerMonth(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("wks_default", agg.DateDiff("$start", "$end", "week")),
+			agg.Compute("wks_monday", agg.DateDiff("$start", "$end", "week", agg.WithDateDiffStartOfWeek("Monday"))),
+			agg.Compute("wks_friday", agg.DateDiff("$start", "$end", "week", agg.WithDateDiffStartOfWeek("fri"))),
+			agg.Exclude("_id"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "wks_default", Value: bson.D{
+				{Key: "$dateDiff", Value: bson.D{
+					{Key: "startDate", Value: "$start"},
+					{Key: "endDate", Value: "$end"},
+					{Key: "unit", Value: "week"},
+				}},
+			}},
+			{Key: "wks_monday", Value: bson.D{
+				{Key: "$dateDiff", Value: bson.D{
+					{Key: "startDate", Value: "$start"},
+					{Key: "endDate", Value: "$end"},
+					{Key: "unit", Value: "week"},
+					{Key: "startOfWeek", Value: "Monday"},
+				}},
+			}},
+			{Key: "wks_friday", Value: bson.D{
+				{Key: "$dateDiff", Value: bson.D{
+					{Key: "startDate", Value: "$start"},
+					{Key: "endDate", Value: "$end"},
+					{Key: "unit", Value: "week"},
+					{Key: "startOfWeek", Value: "fri"},
+				}},
+			}},
+			{Key: "_id", Value: int32(0)},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateFromParts(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("date", agg.DateFromParts(
+				agg.WithDateFromPartsYear(2017),
+				agg.WithDateFromPartsMonth(2),
+				agg.WithDateFromPartsDay(8),
+				agg.WithDateFromPartsHour(12),
+			)),
+			agg.Compute("date_iso", agg.DateFromParts(
+				agg.WithDateFromPartsIsoWeekYear(2017),
+				agg.WithDateFromPartsIsoWeek(6),
+				agg.WithDateFromPartsIsoDayOfWeek(3),
+				agg.WithDateFromPartsHour(12),
+			)),
+			agg.Compute("date_timezone", agg.DateFromParts(
+				agg.WithDateFromPartsYear(2016),
+				agg.WithDateFromPartsMonth(12),
+				agg.WithDateFromPartsDay(31),
+				agg.WithDateFromPartsHour(23),
+				agg.WithDateFromPartsMinute(46),
+				agg.WithDateFromPartsSecond(12),
+				agg.WithDateFromPartsTimezone("America/New_York"),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "date", Value: bson.D{
+				{Key: "$dateFromParts", Value: bson.D{
+					{Key: "year", Value: 2017},
+					{Key: "month", Value: 2},
+					{Key: "day", Value: 8},
+					{Key: "hour", Value: 12},
+				}},
+			}},
+			{Key: "date_iso", Value: bson.D{
+				{Key: "$dateFromParts", Value: bson.D{
+					{Key: "isoWeekYear", Value: 2017},
+					{Key: "isoWeek", Value: 6},
+					{Key: "isoDayOfWeek", Value: 3},
+					{Key: "hour", Value: 12},
+				}},
+			}},
+			{Key: "date_timezone", Value: bson.D{
+				{Key: "$dateFromParts", Value: bson.D{
+					{Key: "year", Value: 2016},
+					{Key: "month", Value: 12},
+					{Key: "day", Value: 31},
+					{Key: "hour", Value: 23},
+					{Key: "minute", Value: 46},
+					{Key: "second", Value: 12},
+					{Key: "timezone", Value: "America/New_York"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateFromString_ConvertingDates(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("date", agg.DateFromString("$date", agg.WithDateFromStringTimezone("America/New_York"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "date", Value: bson.D{
+				{Key: "$dateFromString", Value: bson.D{
+					{Key: "dateString", Value: "$date"},
+					{Key: "timezone", Value: "America/New_York"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateFromString_OnError(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute(
+				"date",
+				agg.DateFromString(
+					"$date",
+					agg.WithDateFromStringTimezone("$timezone"),
+					agg.WithDateFromStringOnError("$date"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "date", Value: bson.D{
+				{Key: "$dateFromString", Value: bson.D{
+					{Key: "dateString", Value: "$date"},
+					{Key: "timezone", Value: "$timezone"},
+					{Key: "onError", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateFromString_OnNull(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute(
+				"date",
+				agg.DateFromString(
+					"$date",
+					agg.WithDateFromStringTimezone("$timezone"),
+					agg.WithDateFromStringOnNull(time.UnixMilli(0).UTC()))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "date", Value: bson.D{
+				{Key: "$dateFromString", Value: bson.D{
+					{Key: "dateString", Value: "$date"},
+					{Key: "timezone", Value: "$timezone"},
+					{Key: "onNull", Value: bson.DateTime(0)},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+// TODO: implement TestDateSubtract_SubtractFixedAmount and TestDateSubtract_FilterByRelativeDates
+// when $expr is implemented
+
+func TestDateSubtract_AdjustForDaylightSavingsTime(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Include("location"),
+			agg.Compute("start", agg.DateToString("$login", agg.WithDateToStringFormat("%Y-%m-%d %H:%M"))),
+			agg.Compute("days", agg.DateToString(
+				agg.DateSubtract("$login", "day", 1, agg.WithDateSubtractTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"))),
+			agg.Compute("hours", agg.DateToString(
+				agg.DateSubtract("$login", "hour", 24, agg.WithDateSubtractTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"))),
+			agg.Compute("startTZInfo", agg.DateToString("$login",
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"),
+				agg.WithDateToStringTimezone("$location"))),
+			agg.Compute("daysTZInfo", agg.DateToString(
+				agg.DateSubtract("$login", "day", 1, agg.WithDateSubtractTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"),
+				agg.WithDateToStringTimezone("$location"))),
+			agg.Compute("hoursTZInfo", agg.DateToString(
+				agg.DateSubtract("$login", "hour", 24, agg.WithDateSubtractTimezone("$location")),
+				agg.WithDateToStringFormat("%Y-%m-%d %H:%M"),
+				agg.WithDateToStringTimezone("$location"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: int32(0)},
+			{Key: "location", Value: int32(1)},
+			{Key: "start", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$login"},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+				}},
+			}},
+			{Key: "days", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateSubtract", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "day"},
+							{Key: "amount", Value: 1},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+				}},
+			}},
+			{Key: "hours", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateSubtract", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "hour"},
+							{Key: "amount", Value: 24},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+				}},
+			}},
+			{Key: "startTZInfo", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$login"},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+					{Key: "timezone", Value: "$location"},
+				}},
+			}},
+			{Key: "daysTZInfo", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateSubtract", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "day"},
+							{Key: "amount", Value: 1},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+					{Key: "timezone", Value: "$location"},
+				}},
+			}},
+			{Key: "hoursTZInfo", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: bson.D{
+						{Key: "$dateSubtract", Value: bson.D{
+							{Key: "startDate", Value: "$login"},
+							{Key: "unit", Value: "hour"},
+							{Key: "amount", Value: 24},
+							{Key: "timezone", Value: "$location"},
+						}},
+					}},
+					{Key: "format", Value: "%Y-%m-%d %H:%M"},
+					{Key: "timezone", Value: "$location"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateToParts(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("date", agg.DateToParts("$date")),
+			agg.Compute("date_iso", agg.DateToParts("$date", agg.WithDateToPartsIso8601(true))),
+			agg.Compute("date_timezone", agg.DateToParts("$date", agg.WithDateToPartsTimezone("America/New_York"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "date", Value: bson.D{
+				{Key: "$dateToParts", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+			{Key: "date_iso", Value: bson.D{
+				{Key: "$dateToParts", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "iso8601", Value: true},
+				}},
+			}},
+			{Key: "date_timezone", Value: bson.D{
+				{Key: "$dateToParts", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "timezone", Value: "America/New_York"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateToString(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("yearMonthDayUTC", agg.DateToString("$date",
+				agg.WithDateToStringFormat("%Y-%m-%d"))),
+			agg.Compute("timewithOffsetNY", agg.DateToString("$date",
+				agg.WithDateToStringFormat("%H:%M:%S:%L%z"),
+				agg.WithDateToStringTimezone("America/New_York"))),
+			agg.Compute("timewithOffset430", agg.DateToString("$date",
+				agg.WithDateToStringFormat("%H:%M:%S:%L%z"),
+				agg.WithDateToStringTimezone("+04:30"))),
+			agg.Compute("minutesOffsetNY", agg.DateToString("$date",
+				agg.WithDateToStringFormat("%Z"),
+				agg.WithDateToStringTimezone("America/New_York"))),
+			agg.Compute("minutesOffset430", agg.DateToString("$date",
+				agg.WithDateToStringFormat("%Z"),
+				agg.WithDateToStringTimezone("+04:30"))),
+			agg.Compute("abbreviated_month", agg.DateToString("$date",
+				agg.WithDateToStringFormat("%b"),
+				agg.WithDateToStringTimezone("+04:30"))),
+			agg.Compute("full_month", agg.DateToString("$date",
+				agg.WithDateToStringFormat("%B"),
+				agg.WithDateToStringTimezone("+04:30"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "yearMonthDayUTC", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "format", Value: "%Y-%m-%d"},
+				}},
+			}},
+			{Key: "timewithOffsetNY", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "format", Value: "%H:%M:%S:%L%z"},
+					{Key: "timezone", Value: "America/New_York"},
+				}},
+			}},
+			{Key: "timewithOffset430", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "format", Value: "%H:%M:%S:%L%z"},
+					{Key: "timezone", Value: "+04:30"},
+				}},
+			}},
+			{Key: "minutesOffsetNY", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "format", Value: "%Z"},
+					{Key: "timezone", Value: "America/New_York"},
+				}},
+			}},
+			{Key: "minutesOffset430", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "format", Value: "%Z"},
+					{Key: "timezone", Value: "+04:30"},
+				}},
+			}},
+			{Key: "abbreviated_month", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "format", Value: "%b"},
+					{Key: "timezone", Value: "+04:30"},
+				}},
+			}},
+			{Key: "full_month", Value: bson.D{
+				{Key: "$dateToString", Value: bson.D{
+					{Key: "date", Value: "$date"},
+					{Key: "format", Value: "%B"},
+					{Key: "timezone", Value: "+04:30"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateTrunc_ProjectStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("_id"),
+			agg.Include("orderDate"),
+			agg.Compute(
+				"truncatedOrderDate",
+				agg.DateTrunc(
+					"$orderDate",
+					"week",
+					agg.WithDateTruncBinSize(2),
+					agg.WithDateTruncTimezone("America/Los_Angeles"),
+					agg.WithDateTruncStartOfWeek("Monday"),
+				),
+			),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: int32(1)},
+			{Key: "orderDate", Value: int32(1)},
+			{Key: "truncatedOrderDate", Value: bson.D{
+				{Key: "$dateTrunc", Value: bson.D{
+					{Key: "date", Value: "$orderDate"},
+					{Key: "unit", Value: "week"},
+					{Key: "binSize", Value: 2},
+					{Key: "timezone", Value: "America/Los_Angeles"},
+					{Key: "startOfWeek", Value: "Monday"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDateTrunc_GroupStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			bson.D{{Key: "truncatedOrderDate", Value: agg.DateTrunc("$orderDate", "month",
+				agg.WithDateTruncBinSize(6))}},
+			agg.Accumulate("sumQuantity", agg.SumAccumulator("$quantity")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{
+				{Key: "truncatedOrderDate", Value: bson.D{
+					{Key: "$dateTrunc", Value: bson.D{
+						{Key: "date", Value: "$orderDate"},
+						{Key: "unit", Value: "month"},
+						{Key: "binSize", Value: 6},
+					}},
+				}},
+			}},
+			{Key: "sumQuantity", Value: bson.D{
+				{Key: "$sum", Value: "$quantity"},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDayOfMonth(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("day", agg.DayOfMonth("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "day", Value: bson.D{
+				{Key: "$dayOfMonth", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDayOfWeek(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("dayOfWeek", agg.DayOfWeek("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "dayOfWeek", Value: bson.D{
+				{Key: "$dayOfWeek", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDayOfYear(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("dayOfYear", agg.DayOfYear("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "dayOfYear", Value: bson.D{
+				{Key: "$dayOfYear", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestDegreesToRadians(t *testing.T) {
 	got := agg.Pipeline{
 		agg.AddFieldsStage(
@@ -980,6 +1682,24 @@ func TestGte(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
+func TestHour(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("hour", agg.Hour("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "hour", Value: bson.D{
+				{Key: "$hour", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestIfNull_SingleInputExpr(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
@@ -1258,6 +1978,68 @@ func TestIsNumber_CheckIfFieldIsNumeric(t *testing.T) {
 
 // TODO: implement TestIsNumber_ConditionallyModifyFields when $cond is implemented
 
+func TestIsoDayOfWeek(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Compute("name", "$name"),
+			agg.Compute("dayOfWeek", agg.IsoDayOfWeek("$birthday")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "name", Value: "$name"},
+			{Key: "dayOfWeek", Value: bson.D{
+				{Key: "$isoDayOfWeek", Value: bson.D{
+					{Key: "date", Value: "$birthday"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestIsoWeek(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Compute("city", "$city"),
+			agg.Compute("weekNumber", agg.IsoWeek("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "city", Value: "$city"},
+			{Key: "weekNumber", Value: bson.D{
+				{Key: "$isoWeek", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestIsoWeekYear(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("yearNumber", agg.IsoWeekYear("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "yearNumber", Value: bson.D{
+				{Key: "$isoWeekYear", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestLast(t *testing.T) {
 	got := agg.Pipeline{
 		agg.AddFieldsStage(
@@ -1459,6 +2241,24 @@ func TestMaxN(t *testing.T) {
 
 // TODO: implement $mergeObjects tests when $lookup and $replaceRoot stages are implemented
 
+func TestMillisecond(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("millisecond", agg.Millisecond("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "millisecond", Value: bson.D{
+				{Key: "$millisecond", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestMin(t *testing.T) {
 	got := agg.Pipeline{
 		agg.ProjectStage(
@@ -1494,6 +2294,24 @@ func TestMinN(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
+func TestMinute(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("minutes", agg.Minute("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "minutes", Value: bson.D{
+				{Key: "$minute", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestMod(t *testing.T) {
 	got := agg.Pipeline{
 		agg.ProjectStage(
@@ -1504,6 +2322,24 @@ func TestMod(t *testing.T) {
 		bson.D{{Key: "$project", Value: bson.D{
 			{Key: "remainder", Value: bson.D{
 				{Key: "$mod", Value: bson.A{"$hours", "$tasks"}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestMonth(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("month", agg.Month("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "month", Value: bson.D{
+				{Key: "$month", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
 			}},
 		}}},
 	}
@@ -2035,6 +2871,24 @@ func TestRtrim_WithTrimChars(t *testing.T) {
 				{Key: "input", Value: "$description"},
 				{Key: "chars", Value: "*"},
 			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestSecond(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("seconds", agg.Second("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "seconds", Value: bson.D{
+				{Key: "$second", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
 		}}},
 	}
 	assertPipelineEqual(t, got, want)
@@ -2677,7 +3531,27 @@ func TestToArray_ConvertBinDataToArray(t *testing.T) {
 
 // TODO: implement $toBool tests when $switch is implemented
 
-// TODO: implement $toDate tests when date functionality is implemented
+func TestToDate(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("convertedDate", agg.ToDate("$order_date")),
+		),
+		agg.SortStage(
+			agg.Sort("convertedDate", agg.Asc),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "convertedDate", Value: bson.D{
+				{Key: "$toDate", Value: "$order_date"},
+			}},
+		}}},
+		bson.D{{Key: "$sort", Value: bson.D{
+			{Key: "convertedDate", Value: int32(1)},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestToDecimal(t *testing.T) {
 	got := agg.Pipeline{
@@ -2929,6 +3803,44 @@ func TestTrunc_WithTruncPlace(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
+// TODO: implement $tsIncrement tests when $expr is implemented
+
+func TestTsSecond_ObtainNumberOfSecondsFromTimestampField(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Include("saleTimestamp"),
+			agg.Compute("saleSeconds", agg.TsSecond("$saleTimestamp")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: int32(0)},
+			{Key: "saleTimestamp", Value: int32(1)},
+			{Key: "saleSeconds", Value: bson.D{
+				{Key: "$tsSecond", Value: "$saleTimestamp"},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestTsSecond_UseInChangeStreamCursorToMonitorCollectionChanges(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("clusterTimeSeconds", agg.TsSecond("$clusterTime")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "clusterTimeSeconds", Value: bson.D{
+				{Key: "$tsSecond", Value: "$clusterTime"},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestType(t *testing.T) {
 	got := agg.Pipeline{
 		agg.ProjectStage(
@@ -2946,6 +3858,42 @@ func TestType(t *testing.T) {
 }
 
 // TODO: implement $unsetField tests when $replaceWith is implemented
+
+func TestWeek(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("week", agg.Week("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "week", Value: bson.D{
+				{Key: "$week", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestYear(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("year", agg.Year("$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "year", Value: bson.D{
+				{Key: "$year", Value: bson.D{
+					{Key: "date", Value: "$date"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestZip_MatrixTransposition(t *testing.T) {
 	got := agg.Pipeline{
