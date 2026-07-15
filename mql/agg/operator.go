@@ -90,6 +90,12 @@ func Avg(exprs ...Expr) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$avg", Value: exprs}}}
 }
 
+// BinarySize returns the size of a string or binary data value's content in bytes ($binarySize).
+// The argument must resolve to a string, binary data, or null.
+func BinarySize(expr Expr) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$binarySize", Value: expr}}}
+}
+
 // BitAnd returns the bitwise AND of int or long values ($bitAnd).
 // MongoDB requires int or long operands; other numeric types cause a runtime error.
 func BitAnd(exprs ...Expr) NumberExpr {
@@ -147,6 +153,12 @@ func BottomN[T ArrayResolver](n Expr, input T, output Expr, sortBy ...SortField)
 	}}}}
 }
 
+// BsonSize returns the size in bytes of a document when encoded as BSON ($bsonSize).
+// The argument must resolve to an object or null.
+func BsonSize[T ObjectResolver](object T) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$bsonSize", Value: object}}}
+}
+
 // Ceil returns the smallest integer greater than or equal to the number ($ceil).
 func Ceil[T NumberResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$ceil", Value: expr}}}
@@ -175,6 +187,56 @@ func ConcatArrays[T ArrayResolver, U ArrayResolver](array T, arrays ...U) ArrayE
 		v[i+1] = arrays[i]
 	}
 	return ArrayExpr{expr: bson.D{{Key: "$concatArrays", Value: v}}}
+}
+
+type convertOptions struct {
+	onError any
+	onNull  any
+	base    any
+}
+
+func WithConvertOnError(onError Expr) Option[convertOptions] {
+	return func(o *convertOptions) {
+		o.onError = onError
+	}
+}
+
+func WithConvertOnNull(onNull Expr) Option[convertOptions] {
+	return func(o *convertOptions) {
+		o.onNull = onNull
+	}
+}
+
+func WithConvertBase(base int32) Option[convertOptions] {
+	return func(o *convertOptions) {
+		o.base = base
+	}
+}
+
+// Convert converts the input value to the type named by to ($convert).
+// to must resolve to a string type name or numeric type code. Optionally provide a value
+// returned on a conversion error via WithConvertOnError, a value returned when the input is
+// null or missing via WithConvertOnNull, and the numeric base (2, 8, 10, or 16) used when
+// converting between strings and integers via WithConvertBase; base defaults to 10 (MongoDB 8.3+).
+func Convert[T StringResolver | NumberResolver](input Expr, to T, opts ...Option[convertOptions]) AnyExpr {
+	var o convertOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	doc := bson.D{
+		{Key: "input", Value: input},
+		{Key: "to", Value: to},
+	}
+	if o.onError != nil {
+		doc = append(doc, bson.E{Key: "onError", Value: o.onError})
+	}
+	if o.onNull != nil {
+		doc = append(doc, bson.E{Key: "onNull", Value: o.onNull})
+	}
+	if o.base != nil {
+		doc = append(doc, bson.E{Key: "base", Value: o.base})
+	}
+	return AnyExpr{expr: bson.D{{Key: "$convert", Value: doc}}}
 }
 
 // Cos returns the cosine of a value in radians ($cos).
@@ -263,6 +325,31 @@ func FirstN[T ArrayResolver](n Expr, input T) ArrayExpr {
 // Floor returns the largest integer less than or equal to the number ($floor).
 func Floor[T NumberResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$floor", Value: expr}}}
+}
+
+type getFieldOptions struct {
+	input any
+}
+
+func WithGetFieldInput(input Expr) Option[getFieldOptions] {
+	return func(o *getFieldOptions) {
+		o.input = input
+	}
+}
+
+// GetField returns the value of the specified field from a document ($getField).
+// field must resolve to a string constant. Optionally provide the document to read from via
+// WithGetFieldInput; it defaults to the document currently being processed ($$CURRENT).
+func GetField[T StringResolver](field T, opts ...Option[getFieldOptions]) AnyExpr {
+	var o getFieldOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	doc := bson.D{{Key: "field", Value: field}}
+	if o.input != nil {
+		doc = append(doc, bson.E{Key: "input", Value: o.input})
+	}
+	return AnyExpr{expr: bson.D{{Key: "$getField", Value: doc}}}
 }
 
 // Gt returns true if a is greater than b ($gt).
@@ -375,6 +462,16 @@ func IndexOfCP[T StringResolver, U StringResolver](str T, substring U, opts ...O
 	return NumberExpr{expr: bson.D{{Key: "$indexOfCP", Value: args}}}
 }
 
+// IsArray returns true if the operand resolves to an array ($isArray).
+func IsArray(expr Expr) BoolExpr {
+	return BoolExpr{expr: bson.D{{Key: "$isArray", Value: bson.A{expr}}}}
+}
+
+// IsNumber returns true if the expression resolves to an integer, decimal, double, or long ($isNumber).
+func IsNumber(expr Expr) BoolExpr {
+	return BoolExpr{expr: bson.D{{Key: "$isNumber", Value: expr}}}
+}
+
 // Last returns the last element of the array expression ($last).
 // This is the array expression operator (MongoDB 4.4+).
 // See LastAccumulator for the $group/$setWindowFields accumulator form.
@@ -452,6 +549,12 @@ func MaxN[T ArrayResolver](n Expr, input T) ArrayExpr {
 	}}}}
 }
 
+// MergeObjects combines multiple documents into a single document ($mergeObjects).
+// Each argument must resolve to a document.
+func MergeObjects(documents ...Expr) ObjectExpr {
+	return ObjectExpr{expr: bson.D{{Key: "$mergeObjects", Value: documents}}}
+}
+
 // Min returns the minimum value among the given expressions ($min).
 // Accepts any expression type (Expr = any).
 func Min(value Expr, values ...Expr) AnyExpr {
@@ -497,6 +600,12 @@ func Ne(a Expr, b Expr) BoolExpr {
 // $not takes a single-element array in the aggregation expression syntax.
 func Not[T BoolResolver](e T) BoolExpr {
 	return BoolExpr{expr: bson.D{{Key: "$not", Value: bson.A{e}}}}
+}
+
+// ObjectToArray converts a document to an array of key-value pair documents ($objectToArray).
+// The argument must resolve to a document; only top-level fields are converted.
+func ObjectToArray[T ObjectResolver](object T) ArrayExpr {
+	return ArrayExpr{expr: bson.D{{Key: "$objectToArray", Value: object}}}
 }
 
 // Or returns true when any expression evaluates to true ($or).
@@ -661,6 +770,17 @@ func SetDifference[T ArrayResolver, U ArrayResolver](expr1 T, expr2 U) ArrayExpr
 	return ArrayExpr{expr: bson.D{{Key: "$setDifference", Value: bson.A{expr1, expr2}}}}
 }
 
+// SetDocField adds, updates, or removes the specified field in a document ($setField).
+// field must resolve to a string constant and input must resolve to a document.
+// Set value to the "$$REMOVE" system variable to remove field from the document.
+func SetDocField[T StringResolver, U ObjectResolver](field T, input U, value Expr) ObjectExpr {
+	return ObjectExpr{expr: bson.D{{Key: "$setField", Value: bson.D{
+		{Key: "field", Value: field},
+		{Key: "input", Value: input},
+		{Key: "value", Value: value},
+	}}}}
+}
+
 // SetEquals returns true if all input sets have the same distinct elements ($setEquals).
 func SetEquals[T ArrayResolver](exprs ...T) BoolExpr {
 	a := make(bson.A, len(exprs))
@@ -817,6 +937,12 @@ func Subtract[T NumberResolver, U NumberResolver](a T, b U) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$subtract", Value: bson.A{a, b}}}}
 }
 
+// Subtype returns the subtype of a value as an integer ($subtype).
+// The argument must resolve to a BinData value.
+func Subtype(expr Expr) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$subtype", Value: expr}}}
+}
+
 // Sum returns the sum of numeric expressions ($sum).
 func Sum(exprs ...Expr) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$sum", Value: exprs}}}
@@ -832,9 +958,61 @@ func Tanh[T NumberResolver](expr T) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$tanh", Value: expr}}}
 }
 
+// ToArray converts a value to an array ($toArray).
+// Returns null if the value is null or missing; errors if it cannot be converted.
+func ToArray(expr Expr) ArrayExpr {
+	return ArrayExpr{expr: bson.D{{Key: "$toArray", Value: expr}}}
+}
+
+// ToBool converts a value to a boolean ($toBool).
+func ToBool(expr Expr) BoolExpr {
+	return BoolExpr{expr: bson.D{{Key: "$toBool", Value: expr}}}
+}
+
+// ToDecimal converts a value to a Decimal128 ($toDecimal).
+func ToDecimal(expr Expr) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$toDecimal", Value: expr}}}
+}
+
+// ToDouble converts a value to a double ($toDouble).
+func ToDouble(expr Expr) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$toDouble", Value: expr}}}
+}
+
+// ToHashedIndexKey computes the hash of the input using MongoDB's hashed-index hash function ($toHashedIndexKey).
+func ToHashedIndexKey(value Expr) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$toHashedIndexKey", Value: value}}}
+}
+
+// ToInt converts a value to an integer ($toInt).
+func ToInt(expr Expr) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$toInt", Value: expr}}}
+}
+
+// ToLong converts a value to a long ($toLong).
+func ToLong(expr Expr) NumberExpr {
+	return NumberExpr{expr: bson.D{{Key: "$toLong", Value: expr}}}
+}
+
 // ToLower converts a string to lowercase ($toLower).
 func ToLower[T StringResolver](expr T) StringExpr {
 	return StringExpr{expr: bson.D{{Key: "$toLower", Value: expr}}}
+}
+
+// ToObject converts a string to an object ($toObject).
+// Returns null if the value is null or missing; errors if it cannot be converted.
+func ToObject(expr Expr) ObjectExpr {
+	return ObjectExpr{expr: bson.D{{Key: "$toObject", Value: expr}}}
+}
+
+// ToObjectId converts a value to an ObjectId ($toObjectId).
+func ToObjectId(expr Expr) AnyExpr {
+	return AnyExpr{expr: bson.D{{Key: "$toObjectId", Value: expr}}}
+}
+
+// ToString converts a value to a string ($toString).
+func ToString(expr Expr) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$toString", Value: expr}}}
 }
 
 // Top returns the top element within an array according to the specified sort order ($top).
@@ -922,6 +1100,20 @@ func Trunc[T NumberResolver](number T, opts ...Option[truncOptions]) NumberExpr 
 		args = append(args, o.place)
 	}
 	return NumberExpr{expr: bson.D{{Key: "$trunc", Value: args}}}
+}
+
+// Type returns the BSON data type of the expression as a string ($type).
+func Type(expr Expr) StringExpr {
+	return StringExpr{expr: bson.D{{Key: "$type", Value: expr}}}
+}
+
+// UnsetDocField removes the specified field from a document ($unsetField).
+// field must resolve to a string constant and input must resolve to a document.
+func UnsetDocField[T StringResolver, U ObjectResolver](field T, input U) ObjectExpr {
+	return ObjectExpr{expr: bson.D{{Key: "$unsetField", Value: bson.D{
+		{Key: "field", Value: field},
+		{Key: "input", Value: input},
+	}}}}
 }
 
 type zipOptions struct {
