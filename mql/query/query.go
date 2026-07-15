@@ -31,9 +31,24 @@ func Field(name string, conds ...FieldCondition) Filter {
 	return Filter{{Key: name, Value: merged}}
 }
 
+// And creates a Filter for logical AND: { $and: [ filter1, filter2, ... ] }.
+func And(filters ...Filter) Filter {
+	clauses := make(bson.A, 0, len(filters))
+	for _, f := range filters {
+		clauses = append(clauses, bson.D(f))
+	}
+	return Filter{{Key: "$and", Value: clauses}}
+}
+
 // Eq creates a FieldCondition for equality: { $eq: value }.
 func Eq(value any) FieldCondition {
 	return FieldCondition{doc: bson.D{{Key: "$eq", Value: value}}}
+}
+
+// Exists creates a FieldCondition matching documents that have (or lack) the
+// field: { $exists: exists }.
+func Exists(exists bool) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$exists", Value: exists}}}
 }
 
 // Gt creates a FieldCondition for greater than: { $gt: value }.
@@ -46,6 +61,11 @@ func Gte(value any) FieldCondition {
 	return FieldCondition{doc: bson.D{{Key: "$gte", Value: value}}}
 }
 
+// In creates a FieldCondition matching any of the given values: { $in: [ ... ] }.
+func In(values ...any) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$in", Value: bson.A(values)}}}
+}
+
 // Lt creates a FieldCondition for less than: { $lt: value }.
 func Lt(value any) FieldCondition {
 	return FieldCondition{doc: bson.D{{Key: "$lt", Value: value}}}
@@ -56,13 +76,21 @@ func Lte(value any) FieldCondition {
 	return FieldCondition{doc: bson.D{{Key: "$lte", Value: value}}}
 }
 
-// And creates a Filter for logical AND: { $and: [ filter1, filter2, ... ] }.
-func And(filters ...Filter) Filter {
-	clauses := make(bson.A, 0, len(filters))
-	for _, f := range filters {
-		clauses = append(clauses, bson.D(f))
-	}
-	return Filter{{Key: "$and", Value: clauses}}
+// Ne creates a FieldCondition matching values not equal to value: { $ne: value }.
+func Ne(value any) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$ne", Value: value}}}
+}
+
+// Nin creates a FieldCondition matching none of the given values: { $nin: [ ... ] }.
+func Nin(values ...any) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$nin", Value: bson.A(values)}}}
+}
+
+// Type creates a FieldCondition matching documents where the field is one of the
+// specified BSON types: { $type: [ ... ] }. Each type may be an alias string or
+// numeric code. The verbose array form is always emitted.
+func Type(types ...any) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$type", Value: bson.A(types)}}}
 }
 
 // Or creates a Filter for logical OR: { $or: [ filter1, filter2, ... ] }.
