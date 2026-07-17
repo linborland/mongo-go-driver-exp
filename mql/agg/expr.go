@@ -1,6 +1,8 @@
 package agg
 
 import (
+	"time"
+
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -28,6 +30,18 @@ type BoolResolver interface {
 
 type ObjectResolver interface {
 	AnyExpr | ObjectExpr | string | bson.D | bson.M
+}
+
+type DateResolver interface {
+	AnyExpr | DateExpr | time.Time | string
+}
+
+type TimestampResolver interface {
+	AnyExpr | bson.Timestamp | string
+}
+
+type ObjectIDResolver interface {
+	AnyExpr | bson.ObjectID | string
 }
 
 type Expr any
@@ -104,5 +118,14 @@ type BoolExpr struct {
 
 func (be BoolExpr) MarshalBSONValue() (byte, []byte, error) {
 	typ, b, err := bson.MarshalValue(be.expr)
+	return byte(typ), b, err
+}
+
+type DateExpr struct {
+	expr Expr
+}
+
+func (de DateExpr) MarshalBSONValue() (byte, []byte, error) {
+	typ, b, err := bson.MarshalValue(de.expr)
 	return byte(typ), b, err
 }
