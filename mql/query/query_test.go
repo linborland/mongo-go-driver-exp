@@ -1332,7 +1332,7 @@ func TestText_DiacriticSensitiveSearch(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: test TestTExt_TextSearchScoreExamples when $meta is implemented
+// TODO: test TestText_TextSearchScoreExamples when $meta is implemented
 
 func TestType_QueryingByDataType(t *testing.T) {
 	got := agg.Pipeline{
