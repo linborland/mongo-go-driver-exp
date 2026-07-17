@@ -57,6 +57,40 @@ func And(filters ...Filter) Filter {
 	return Filter{{Key: "$and", Value: clauses}}
 }
 
+// Bitmask is the set of types accepted by the $bits* operators: an integer
+// bitmask, a bson.Binary bitmask, or an array of bit positions.
+type Bitmask interface {
+	~int | ~int32 | ~int64 | bson.Binary | ~[]int | ~[]int32 | ~[]int64
+}
+
+// BitsAllClear creates a FieldCondition matching numeric or binary values in
+// which all of the given bit positions are 0: { $bitsAllClear: bitmask }. The
+// bitmask may be an int, a bson.Binary, or an array of bit positions.
+func BitsAllClear[T Bitmask](bitmask T) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$bitsAllClear", Value: bitmask}}}
+}
+
+// BitsAllSet creates a FieldCondition matching numeric or binary values in which
+// all of the given bit positions are 1: { $bitsAllSet: bitmask }. The bitmask
+// may be an int, a bson.Binary, or an array of bit positions.
+func BitsAllSet[T Bitmask](bitmask T) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$bitsAllSet", Value: bitmask}}}
+}
+
+// BitsAnyClear creates a FieldCondition matching numeric or binary values in
+// which any of the given bit positions are 0: { $bitsAnyClear: bitmask }. The
+// bitmask may be an int, a bson.Binary, or an array of bit positions.
+func BitsAnyClear[T Bitmask](bitmask T) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$bitsAnyClear", Value: bitmask}}}
+}
+
+// BitsAnySet creates a FieldCondition matching numeric or binary values in which
+// any of the given bit positions are 1: { $bitsAnySet: bitmask }. The bitmask
+// may be an int, a bson.Binary, or an array of bit positions.
+func BitsAnySet[T Bitmask](bitmask T) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$bitsAnySet", Value: bitmask}}}
+}
+
 // Box creates a legacy rectangular box geometry ($box) from the bottom-left and
 // top-right coordinate pairs, for use with GeoWithin.
 func Box(bottomLeft, topRight []float64) Geometry {
@@ -75,6 +109,12 @@ func Center(center []float64, radius float64) Geometry {
 // using spherical geometry.
 func CenterSphere(center []float64, radius float64) Geometry {
 	return Geometry{doc: bson.D{{Key: "$centerSphere", Value: bson.A{center, radius}}}}
+}
+
+// Comment creates a Filter that adds a comment to a query predicate:
+// { $comment: comment }.
+func Comment(comment string) Filter {
+	return Filter{{Key: "$comment", Value: comment}}
 }
 
 // ElemMatch creates a FieldCondition matching arrays with at least one element
@@ -98,6 +138,12 @@ func Eq(value any) FieldCondition {
 // field: { $exists: exists }.
 func Exists(exists bool) FieldCondition {
 	return FieldCondition{{Key: "$exists", Value: exists}}
+}
+
+// Expr creates a Filter that allows an aggregation expression within the query
+// language: { $expr: expression }.
+func Expr(expr any) Filter {
+	return Filter{{Key: "$expr", Value: expr}}
 }
 
 // Geometry represents a geometry value supplied to the geospatial query
@@ -175,6 +221,12 @@ func In(values ...any) FieldCondition {
 	return FieldCondition{{Key: "$in", Value: bson.A(values)}}
 }
 
+// JsonSchema creates a Filter that validates documents against the given JSON
+// Schema: { $jsonSchema: schema }.
+func JsonSchema(schema any) Filter {
+	return Filter{{Key: "$jsonSchema", Value: schema}}
+}
+
 // Lt creates a FieldCondition for less than: { $lt: value }.
 func Lt(value any) FieldCondition {
 	return FieldCondition{{Key: "$lt", Value: value}}
@@ -195,6 +247,12 @@ func MaxDistance[T Number](value T) FieldCondition {
 // at least the given distance from the center point: { $minDistance: value }.
 func MinDistance[T Number](value T) FieldCondition {
 	return FieldCondition{{Key: "$minDistance", Value: value}}
+}
+
+// Mod creates a FieldCondition that performs a modulo operation on the field
+// and matches the specified result: { $mod: [ divisor, remainder ] }.
+func Mod[D, R Number](divisor D, remainder R) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$mod", Value: bson.A{divisor, remainder}}}}
 }
 
 type nearOptions struct {
@@ -292,10 +350,69 @@ func Polygon(points ...[]float64) Geometry {
 	return Geometry{doc: bson.D{{Key: "$polygon", Value: [][]float64(points)}}}
 }
 
+// Regex creates a FieldCondition matching values against a regular expression:
+// { $regex: regex }. Use the Options field of bson.Regex for flags like "i".
+func Regex(regex bson.Regex) FieldCondition {
+	return FieldCondition{doc: bson.D{{Key: "$regex", Value: regex}}}
+}
+
+// SampleRate creates a Filter that randomly selects documents at the given rate
+// (a probability between 0 and 1): { $sampleRate: rate }.
+func SampleRate(rate any) Filter {
+	return Filter{{Key: "$sampleRate", Value: rate}}
+}
+
 // Size creates a FieldCondition matching arrays with the given number of
 // elements: { $size: value }.
 func Size(value int) FieldCondition {
 	return FieldCondition{{Key: "$size", Value: value}}
+}
+
+type textOptions struct {
+	language           any
+	caseSensitive      any
+	diacriticSensitive any
+}
+
+// WithTextLanguage sets the $language option for a Text search.
+func WithTextLanguage(language string) Option[textOptions] {
+	return func(o *textOptions) {
+		o.language = language
+	}
+}
+
+// WithTextCaseSensitive sets the $caseSensitive option for a Text search.
+func WithTextCaseSensitive(caseSensitive bool) Option[textOptions] {
+	return func(o *textOptions) {
+		o.caseSensitive = caseSensitive
+	}
+}
+
+// WithTextDiacriticSensitive sets the $diacriticSensitive option for a Text search.
+func WithTextDiacriticSensitive(diacriticSensitive bool) Option[textOptions] {
+	return func(o *textOptions) {
+		o.diacriticSensitive = diacriticSensitive
+	}
+}
+
+// Text creates a Filter that performs a text search: { $text: { $search: ... } }.
+// Optional behavior is set via the WithText* options.
+func Text(search string, opts ...Option[textOptions]) Filter {
+	var o textOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	args := bson.D{bson.E{Key: "$search", Value: search}}
+	if o.language != nil {
+		args = append(args, bson.E{Key: "$language", Value: o.language})
+	}
+	if o.caseSensitive != nil {
+		args = append(args, bson.E{Key: "$caseSensitive", Value: o.caseSensitive})
+	}
+	if o.diacriticSensitive != nil {
+		args = append(args, bson.E{Key: "$diacriticSensitive", Value: o.diacriticSensitive})
+	}
+	return Filter{{Key: "$text", Value: args}}
 }
 
 // Type creates a FieldCondition matching documents where the field is one of the
@@ -303,4 +420,10 @@ func Size(value int) FieldCondition {
 // numeric code. The verbose array form is always emitted.
 func Type(types ...any) FieldCondition {
 	return FieldCondition{{Key: "$type", Value: bson.A(types)}}
+}
+
+// Where creates a Filter matching documents that satisfy a JavaScript
+// expression: { $where: function }.
+func Where(function bson.JavaScript) Filter {
+	return Filter{{Key: "$where", Value: function}}
 }
