@@ -126,6 +126,60 @@ func TestAnd_MultipleExpressionsSameOperator(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
+func TestBox(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(
+				query.Box([]float64{0, 0}, []float64{3, 6}),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$box", Value: bson.A{bson.A{0.0, 0.0}, bson.A{3.0, 6.0}}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestCenter(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(
+				query.Center([]float64{-74, 40.74}, 10),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$center", Value: bson.A{bson.A{-74.0, 40.74}, 10.0}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestCenterSphere(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(
+				query.CenterSphere([]float64{-88, 30}, 0.01),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$centerSphere", Value: bson.A{bson.A{-88.0, 30.0}, 0.01}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestElemMatch_ElementMatch(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
@@ -324,6 +378,188 @@ func TestExists_MissingField(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
+func TestGeoJson_Point(t *testing.T) {
+	coords := []float64{-73.9667, 40.78}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoIntersects(query.GeoJson("Point", coords))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoIntersects", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Point"},
+					{Key: "coordinates", Value: bson.A{-73.9667, 40.78}},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestGeoJson_Polygon(t *testing.T) {
+	coords := [][][]float64{{{0, 0}, {3, 6}, {6, 1}, {0, 0}}}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(query.GeoJson("Polygon", coords))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Polygon"},
+					{Key: "coordinates", Value: bson.A{bson.A{
+						bson.A{0.0, 0.0}, bson.A{3.0, 6.0}, bson.A{6.0, 1.0}, bson.A{0.0, 0.0},
+					}}},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestGeoJson_WithCRS(t *testing.T) {
+	coords := [][][]float64{{{-100, 60}, {-100, -60}, {100, -60}, {100, 60}, {-100, 60}}}
+	crs := bson.D{
+		{Key: "type", Value: "name"},
+		{Key: "properties", Value: bson.D{
+			{Key: "name", Value: "urn:x-mongodb:crs:strictwinding:EPSG:4326"},
+		}},
+	}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(
+				query.GeoJson("Polygon", coords, query.WithGeoJsonCrs(crs)),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Polygon"},
+					{Key: "coordinates", Value: bson.A{bson.A{
+						bson.A{-100.0, 60.0}, bson.A{-100.0, -60.0}, bson.A{100.0, -60.0},
+						bson.A{100.0, 60.0}, bson.A{-100.0, 60.0},
+					}}},
+					{Key: "crs", Value: crs},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestGeoIntersects_BigPolygon(t *testing.T) {
+	coords := [][][]float64{{{-100, 60}, {-100, 0}, {-100, -60}, {100, -60}, {100, 60}, {-100, 60}}}
+	crs := bson.D{
+		{Key: "type", Value: "name"},
+		{Key: "properties", Value: bson.D{
+			{Key: "name", Value: "urn:x-mongodb:crs:strictwinding:EPSG:4326"},
+		}},
+	}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoIntersects(
+				query.GeoJson("Polygon", coords, query.WithGeoJsonCrs(crs)),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoIntersects", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Polygon"},
+					{Key: "coordinates", Value: bson.A{bson.A{
+						bson.A{-100.0, 60.0}, bson.A{-100.0, 0.0}, bson.A{-100.0, -60.0},
+						bson.A{100.0, -60.0}, bson.A{100.0, 60.0}, bson.A{-100.0, 60.0},
+					}}},
+					{Key: "crs", Value: crs},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestGeoIntersects_Polygon(t *testing.T) {
+	coords := [][][]float64{{{0, 0}, {3, 6}, {6, 1}, {0, 0}}}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoIntersects(query.GeoJson("Polygon", coords))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoIntersects", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Polygon"},
+					{Key: "coordinates", Value: bson.A{bson.A{
+						bson.A{0.0, 0.0}, bson.A{3.0, 6.0}, bson.A{6.0, 1.0}, bson.A{0.0, 0.0},
+					}}},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestGeoWithin_Polygon(t *testing.T) {
+	coords := [][][]float64{{{0, 0}, {3, 6}, {6, 1}, {0, 0}}}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(query.GeoJson("Polygon", coords))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Polygon"},
+					{Key: "coordinates", Value: bson.A{bson.A{
+						bson.A{0.0, 0.0}, bson.A{3.0, 6.0}, bson.A{6.0, 1.0}, bson.A{0.0, 0.0},
+					}}},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestGeoWithin_BigPolygon(t *testing.T) {
+	coords := [][][]float64{{{-100, 60}, {-100, 0}, {-100, -60}, {100, -60}, {100, 60}, {-100, 60}}}
+	crs := bson.D{
+		{Key: "type", Value: "name"},
+		{Key: "properties", Value: bson.D{
+			{Key: "name", Value: "urn:x-mongodb:crs:strictwinding:EPSG:4326"},
+		}},
+	}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(
+				query.GeoJson("Polygon", coords, query.WithGeoJsonCrs(crs)),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Polygon"},
+					{Key: "coordinates", Value: bson.A{bson.A{
+						bson.A{-100.0, 60.0}, bson.A{-100.0, 0.0}, bson.A{-100.0, -60.0},
+						bson.A{100.0, -60.0}, bson.A{100.0, 60.0}, bson.A{-100.0, 60.0},
+					}}},
+					{Key: "crs", Value: crs},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestGt(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
@@ -411,6 +647,30 @@ func TestLte(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
+func TestMaxDistance(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("loc", query.MaxDistance(5000))),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$maxDistance", Value: 5000}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestMinDistance(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("loc", query.MinDistance(1000))),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$minDistance", Value: 1000}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
 func TestNe(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
@@ -420,6 +680,58 @@ func TestNe(t *testing.T) {
 	want := bson.A{
 		bson.D{{Key: "$match", Value: bson.D{
 			{Key: "qty", Value: bson.D{{Key: "$ne", Value: 20}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestNear(t *testing.T) {
+	coords := []float64{-73.9667, 40.78}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("location", query.Near(
+				query.GeoJson("Point", coords),
+				query.WithNearMinDistance(1000),
+				query.WithNearMaxDistance(5000),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "location", Value: bson.D{{Key: "$near", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Point"},
+					{Key: "coordinates", Value: bson.A{-73.9667, 40.78}},
+				}},
+				{Key: "$minDistance", Value: 1000},
+				{Key: "$maxDistance", Value: 5000},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestNearSphere(t *testing.T) {
+	coords := []float64{-73.9667, 40.78}
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("location", query.NearSphere(
+				query.GeoJson("Point", coords),
+				query.WithNearMinDistance(1000),
+				query.WithNearMaxDistance(5000),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "location", Value: bson.D{{Key: "$nearSphere", Value: bson.D{
+				{Key: "$geometry", Value: bson.D{
+					{Key: "type", Value: "Point"},
+					{Key: "coordinates", Value: bson.A{-73.9667, 40.78}},
+				}},
+				{Key: "$minDistance", Value: 1000},
+				{Key: "$maxDistance", Value: 5000},
+			}}}},
 		}}},
 	}
 	assertPipelineEqual(t, got, want)
@@ -568,6 +880,26 @@ func TestOr_Clauses(t *testing.T) {
 }
 
 // TODO: implement TestOr_ErrorHandling when $expr is implemented
+
+func TestPolygon(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(
+			query.Field("loc", query.GeoWithin(
+				query.Polygon([]float64{0, 0}, []float64{3, 6}, []float64{6, 0}),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "loc", Value: bson.D{{Key: "$geoWithin", Value: bson.D{
+				{Key: "$polygon", Value: bson.A{
+					bson.A{0.0, 0.0}, bson.A{3.0, 6.0}, bson.A{6.0, 0.0},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestSize_QueryAnArrayByLength(t *testing.T) {
 	got := agg.Pipeline{
