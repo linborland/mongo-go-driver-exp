@@ -51,8 +51,8 @@ func All(values ...any) FieldCondition {
 // And creates a Filter for logical AND: { $and: [ filter1, filter2, ... ] }.
 func And(filters ...Filter) Filter {
 	clauses := make(bson.A, 0, len(filters))
-	for _, f := range filters {
-		clauses = append(clauses, bson.D(f))
+	for _, filter := range filters {
+		clauses = append(clauses, bson.D(filter))
 	}
 	return Filter{{Key: "$and", Value: clauses}}
 }
@@ -168,8 +168,8 @@ type geoJSONOptions struct {
 // WithGeoJSONCRS sets the coordinate reference system for a GeoJSON geometry,
 // e.g. to request a big (strict CRS84) polygon.
 func WithGeoJSONCRS(crs bson.D) Option[geoJSONOptions] {
-	return func(o *geoJSONOptions) {
-		o.crs = crs
+	return func(opts *geoJSONOptions) {
+		opts.crs = crs
 	}
 }
 
@@ -263,13 +263,13 @@ type nearOptions struct {
 // WithNearMinDistance limits Near/NearSphere results to at least the given
 // distance (in meters) from the center point.
 func WithNearMinDistance[T Number](d T) Option[nearOptions] {
-	return func(o *nearOptions) { o.minDistance = d }
+	return func(opts *nearOptions) { opts.minDistance = d }
 }
 
 // WithNearMaxDistance limits Near/NearSphere results to at most the given
 // distance (in meters) from the center point.
 func WithNearMaxDistance[T Number](d T) Option[nearOptions] {
-	return func(o *nearOptions) { o.maxDistance = d }
+	return func(opts *nearOptions) { opts.maxDistance = d }
 }
 
 // nearDoc merges the geometry with the optional distance bounds into the value
@@ -319,8 +319,8 @@ func Nin(values ...any) FieldCondition {
 // clause: { $nor: [ filter1, filter2, ... ] }.
 func Nor(filters ...Filter) Filter {
 	clauses := make(bson.A, 0, len(filters))
-	for _, f := range filters {
-		clauses = append(clauses, bson.D(f))
+	for _, filter := range filters {
+		clauses = append(clauses, bson.D(filter))
 	}
 	return Filter{{Key: "$nor", Value: clauses}}
 }
@@ -338,8 +338,8 @@ func Not[T FieldCondition | bson.Regex](value T) FieldCondition {
 // Or creates a Filter for logical OR: { $or: [ filter1, filter2, ... ] }.
 func Or(filters ...Filter) Filter {
 	clauses := make(bson.A, 0, len(filters))
-	for _, f := range filters {
-		clauses = append(clauses, bson.D(f))
+	for _, filter := range filters {
+		clauses = append(clauses, bson.D(filter))
 	}
 	return Filter{{Key: "$or", Value: clauses}}
 }
@@ -358,7 +358,7 @@ func Regex(regex bson.Regex) FieldCondition {
 
 // SampleRate creates a Filter that randomly selects documents at the given rate
 // (a probability between 0 and 1): { $sampleRate: rate }.
-func SampleRate(rate any) Filter {
+func SampleRate(rate float64) Filter {
 	return Filter{{Key: "$sampleRate", Value: rate}}
 }
 
@@ -376,22 +376,22 @@ type textOptions struct {
 
 // WithTextLanguage sets the $language option for a Text search.
 func WithTextLanguage(language string) Option[textOptions] {
-	return func(o *textOptions) {
-		o.language = language
+	return func(opts *textOptions) {
+		opts.language = language
 	}
 }
 
 // WithTextCaseSensitive sets the $caseSensitive option for a Text search.
 func WithTextCaseSensitive(caseSensitive bool) Option[textOptions] {
-	return func(o *textOptions) {
-		o.caseSensitive = caseSensitive
+	return func(opts *textOptions) {
+		opts.caseSensitive = caseSensitive
 	}
 }
 
 // WithTextDiacriticSensitive sets the $diacriticSensitive option for a Text search.
 func WithTextDiacriticSensitive(diacriticSensitive bool) Option[textOptions] {
-	return func(o *textOptions) {
-		o.diacriticSensitive = diacriticSensitive
+	return func(opts *textOptions) {
+		opts.diacriticSensitive = diacriticSensitive
 	}
 }
 
