@@ -68,21 +68,21 @@ func And(filters ...Filter) Filter {
 // Box creates a legacy rectangular box geometry ($box) from the bottom-left and
 // top-right coordinate pairs, for use with GeoWithin.
 func Box(bottomLeft, topRight []float64) Geometry {
-	return geometry{doc: bson.D{{Key: "$box", Value: bson.A{bottomLeft, topRight}}}}
+	return Geometry{doc: bson.D{{Key: "$box", Value: bson.A{bottomLeft, topRight}}}}
 }
 
 // Center creates a legacy circle geometry ($center) from a center coordinate
 // pair and a radius (in coordinate units), for use with GeoWithin using planar
 // geometry.
 func Center(center []float64, radius float64) Geometry {
-	return geometry{doc: bson.D{{Key: "$center", Value: bson.A{center, radius}}}}
+	return Geometry{doc: bson.D{{Key: "$center", Value: bson.A{center, radius}}}}
 }
 
 // CenterSphere creates a legacy spherical circle geometry ($centerSphere) from
 // a center coordinate pair and a radius (in radians), for use with GeoWithin
 // using spherical geometry.
 func CenterSphere(center []float64, radius float64) Geometry {
-	return geometry{doc: bson.D{{Key: "$centerSphere", Value: bson.A{center, radius}}}}
+	return Geometry{doc: bson.D{{Key: "$centerSphere", Value: bson.A{center, radius}}}}
 }
 
 // ElemMatch creates a FieldCondition matching arrays with at least one element
@@ -114,17 +114,13 @@ func Exists(exists bool) FieldCondition {
 }
 
 // Geometry represents a geometry value supplied to the geospatial query
-// operators (GeoWithin, GeoIntersects, Near, NearSphere). Construct via GeoJson
+// operators (GeoWithin, GeoIntersects, Near, NearSphere). Construct via GeoJSON
 // or the legacy shape helpers (Box, Center, CenterSphere, Polygon).
-type Geometry interface{ geometry() geometry }
-
-type geometry struct {
+type Geometry struct {
 	doc bson.D
 }
 
-func (g geometry) geometry() geometry { return g }
-
-// Coordinates constrains the coordinate values of a GeoJson geometry to array
+// Coordinates constrains the coordinate values of a GeoJSON geometry to array
 // shapes. The nesting depth depends on the geometry type: a Point is a single
 // position ([]float64), a Polygon is [][][]float64, and so on. Use bson.A for
 // dynamic or mixed shapes.
@@ -132,24 +128,24 @@ type Coordinates interface {
 	[]float64 | [][]float64 | [][][]float64 | [][][][]float64 | bson.A
 }
 
-type geoJsonOptions struct {
+type geoJSONOptions struct {
 	crs bson.D
 }
 
-// WithGeoJsonCrs sets the coordinate reference system for a GeoJson geometry,
+// WithGeoJSONCRS sets the coordinate reference system for a GeoJSON geometry,
 // e.g. to request a big (strict CRS84) polygon.
-func WithGeoJsonCrs(crs bson.D) Option[geoJsonOptions] {
-	return func(o *geoJsonOptions) {
+func WithGeoJSONCRS(crs bson.D) Option[geoJSONOptions] {
+	return func(o *geoJSONOptions) {
 		o.crs = crs
 	}
 }
 
-// GeoJson creates a GeoJson geometry ($geometry) of the given type (e.g.
+// GeoJSON creates a GeoJSON geometry ($geometry) of the given type (e.g.
 // "Point", "Polygon") and coordinates. The coordinate shape depends on the
 // geometry type. Optionally specify a coordinate reference system via
-// WithGeoJsonCrs.
-func GeoJson[C Coordinates](geoType string, coordinates C, opts ...Option[geoJsonOptions]) Geometry {
-	var o geoJsonOptions
+// WithGeoJSONCRS.
+func GeoJSON[C Coordinates](geoType string, coordinates C, opts ...Option[geoJSONOptions]) Geometry {
+	var o geoJSONOptions
 	for _, opt := range opts {
 		opt(&o)
 	}
@@ -160,21 +156,21 @@ func GeoJson[C Coordinates](geoType string, coordinates C, opts ...Option[geoJso
 	if o.crs != nil {
 		geo = append(geo, bson.E{Key: "crs", Value: o.crs})
 	}
-	return geometry{doc: bson.D{{Key: "$geometry", Value: geo}}}
+	return Geometry{doc: bson.D{{Key: "$geometry", Value: geo}}}
 }
 
 // GeoIntersects creates a FieldCondition matching geometries that intersect the
-// given GeoJson geometry: { $geoIntersects: { $geometry: ... } }. Use GeoJson to
+// given GeoJSON geometry: { $geoIntersects: { $geometry: ... } }. Use GeoJSON to
 // construct the geometry; $geoIntersects does not support the legacy shapes.
 func GeoIntersects(g Geometry) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$geoIntersects", Value: g.geometry().doc}}}
+	return FieldCondition{doc: bson.D{{Key: "$geoIntersects", Value: g.doc}}}
 }
 
 // GeoWithin creates a FieldCondition matching geometries within the given
-// bounding geometry: { $geoWithin: { ... } }. Accepts a GeoJson geometry or any
+// bounding geometry: { $geoWithin: { ... } }. Accepts a GeoJSON geometry or any
 // of the legacy shapes (Box, Center, CenterSphere, Polygon).
 func GeoWithin(g Geometry) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$geoWithin", Value: g.geometry().doc}}}
+	return FieldCondition{doc: bson.D{{Key: "$geoWithin", Value: g.doc}}}
 }
 
 // Gt creates a FieldCondition for greater than: { $gt: value }.
@@ -238,7 +234,7 @@ func nearDoc(g Geometry, opts []Option[nearOptions]) bson.D {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	doc := append(bson.D(nil), g.geometry().doc...)
+	doc := append(bson.D(nil), g.doc...)
 	if o.minDistance != nil {
 		doc = append(doc, bson.E{Key: "$minDistance", Value: o.minDistance})
 	}
@@ -313,7 +309,7 @@ func Or(filters ...Filter) Filter {
 // Polygon creates a legacy polygon geometry ($polygon) from a series of
 // coordinate pairs defining the polygon's vertices, for use with GeoWithin.
 func Polygon(points ...[]float64) Geometry {
-	return geometry{doc: bson.D{{Key: "$polygon", Value: [][]float64(points)}}}
+	return Geometry{doc: bson.D{{Key: "$polygon", Value: [][]float64(points)}}}
 }
 
 // Size creates a FieldCondition matching arrays with the given number of

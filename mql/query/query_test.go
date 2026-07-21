@@ -378,11 +378,11 @@ func TestExists_MissingField(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-func TestGeoJson_Point(t *testing.T) {
+func TestGeoJSON_Point(t *testing.T) {
 	coords := []float64{-73.9667, 40.78}
 	got := agg.Pipeline{
 		agg.MatchStage(
-			query.Field("loc", query.GeoIntersects(query.GeoJson("Point", coords))),
+			query.Field("loc", query.GeoIntersects(query.GeoJSON("Point", coords))),
 		),
 	}
 	want := bson.A{
@@ -398,11 +398,11 @@ func TestGeoJson_Point(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-func TestGeoJson_Polygon(t *testing.T) {
+func TestGeoJSON_Polygon(t *testing.T) {
 	coords := [][][]float64{{{0, 0}, {3, 6}, {6, 1}, {0, 0}}}
 	got := agg.Pipeline{
 		agg.MatchStage(
-			query.Field("loc", query.GeoWithin(query.GeoJson("Polygon", coords))),
+			query.Field("loc", query.GeoWithin(query.GeoJSON("Polygon", coords))),
 		),
 	}
 	want := bson.A{
@@ -420,7 +420,7 @@ func TestGeoJson_Polygon(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-func TestGeoJson_WithCRS(t *testing.T) {
+func TestGeoJSON_WithCRS(t *testing.T) {
 	coords := [][][]float64{{{-100, 60}, {-100, -60}, {100, -60}, {100, 60}, {-100, 60}}}
 	crs := bson.D{
 		{Key: "type", Value: "name"},
@@ -431,7 +431,7 @@ func TestGeoJson_WithCRS(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
 			query.Field("loc", query.GeoWithin(
-				query.GeoJson("Polygon", coords, query.WithGeoJsonCrs(crs)),
+				query.GeoJSON("Polygon", coords, query.WithGeoJSONCRS(crs)),
 			)),
 		),
 	}
@@ -463,7 +463,7 @@ func TestGeoIntersects_BigPolygon(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
 			query.Field("loc", query.GeoIntersects(
-				query.GeoJson("Polygon", coords, query.WithGeoJsonCrs(crs)),
+				query.GeoJSON("Polygon", coords, query.WithGeoJSONCRS(crs)),
 			)),
 		),
 	}
@@ -488,7 +488,7 @@ func TestGeoIntersects_Polygon(t *testing.T) {
 	coords := [][][]float64{{{0, 0}, {3, 6}, {6, 1}, {0, 0}}}
 	got := agg.Pipeline{
 		agg.MatchStage(
-			query.Field("loc", query.GeoIntersects(query.GeoJson("Polygon", coords))),
+			query.Field("loc", query.GeoIntersects(query.GeoJSON("Polygon", coords))),
 		),
 	}
 	want := bson.A{
@@ -510,7 +510,7 @@ func TestGeoWithin_Polygon(t *testing.T) {
 	coords := [][][]float64{{{0, 0}, {3, 6}, {6, 1}, {0, 0}}}
 	got := agg.Pipeline{
 		agg.MatchStage(
-			query.Field("loc", query.GeoWithin(query.GeoJson("Polygon", coords))),
+			query.Field("loc", query.GeoWithin(query.GeoJSON("Polygon", coords))),
 		),
 	}
 	want := bson.A{
@@ -539,7 +539,7 @@ func TestGeoWithin_BigPolygon(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
 			query.Field("loc", query.GeoWithin(
-				query.GeoJson("Polygon", coords, query.WithGeoJsonCrs(crs)),
+				query.GeoJSON("Polygon", coords, query.WithGeoJSONCRS(crs)),
 			)),
 		),
 	}
@@ -690,7 +690,7 @@ func TestNear(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
 			query.Field("location", query.Near(
-				query.GeoJson("Point", coords),
+				query.GeoJSON("Point", coords),
 				query.WithNearMinDistance(1000),
 				query.WithNearMaxDistance(5000),
 			)),
@@ -716,7 +716,7 @@ func TestNearSphere(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(
 			query.Field("location", query.NearSphere(
-				query.GeoJson("Point", coords),
+				query.GeoJSON("Point", coords),
 				query.WithNearMinDistance(1000),
 				query.WithNearMaxDistance(5000),
 			)),
