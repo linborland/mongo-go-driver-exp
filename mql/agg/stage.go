@@ -27,27 +27,14 @@ func (p Pipeline) MarshalBSON() ([]byte, error) {
 // single stage. Everything else (types, With* options) sits directly above the
 // stage it belongs to.
 
-// LetVar binds a variable name to an expression for the let option of $lookup
-// and $merge. Construct via Let.
-type LetVar interface{ letVar() letVar }
-
-type letVar struct {
-	name string
-	expr Expr
-}
-
-func (lv letVar) letVar() letVar { return lv }
-
-// Let binds the variable name to expr. Reference it in a pipeline as "$$name".
-func Let(name string, expr Expr) LetVar {
-	return letVar{name: name, expr: expr}
-}
-
-func letVarsDoc(vars []LetVar) bson.D {
+// setFieldsDoc renders a slice of SetFields as a { name: expr } document,
+// shared by the let option of $lookup and $merge. Bindings are built with
+// Assign, the same way the $let expression operator takes its variables.
+func setFieldsDoc(vars []SetField) bson.D {
 	doc := make(bson.D, len(vars))
 	for i, v := range vars {
-		lv := v.letVar()
-		doc[i] = bson.E{Key: lv.name, Value: lv.expr}
+		sf := v.setField()
+		doc[i] = bson.E{Key: sf.name, Value: sf.expr}
 	}
 	return doc
 }
@@ -970,7 +957,7 @@ type lookupOptions struct {
 	from         any
 	localField   any
 	foreignField any
-	let          []LetVar
+	let          []SetField
 	pipeline     []Stage
 }
 
@@ -992,9 +979,9 @@ func WithLookupForeignField(field string) Option[lookupOptions] {
 	return func(o *lookupOptions) { o.foreignField = field }
 }
 
-// WithLookupLet declares variables (construct via Let) that expose input-document
-// values to the WithLookupPipeline stages.
-func WithLookupLet(vars ...LetVar) Option[lookupOptions] {
+// WithLookupLet declares variables (construct via Assign) that expose
+// input-document values to the WithLookupPipeline stages.
+func WithLookupLet(vars ...SetField) Option[lookupOptions] {
 	return func(o *lookupOptions) { o.let = vars }
 }
 
@@ -1025,7 +1012,7 @@ func LookupStage(as string, opts ...Option[lookupOptions]) Stage {
 		doc = append(doc, bson.E{Key: "foreignField", Value: o.foreignField})
 	}
 	if o.let != nil {
-		doc = append(doc, bson.E{Key: "let", Value: letVarsDoc(o.let)})
+		doc = append(doc, bson.E{Key: "let", Value: setFieldsDoc(o.let)})
 	}
 	if o.pipeline != nil {
 		doc = append(doc, bson.E{Key: "pipeline", Value: pipelineDocs(o.pipeline)})
@@ -1054,7 +1041,7 @@ func MatchStage(filters ...query.Filter) Stage {
 type mergeOptions struct {
 	intoDB         any
 	on             []string
-	let            []LetVar
+	let            []SetField
 	whenMatched    any
 	whenNotMatched any
 }
@@ -1072,9 +1059,9 @@ func WithMergeOn(fields ...string) Option[mergeOptions] {
 	return func(o *mergeOptions) { o.on = fields }
 }
 
-// WithMergeLet declares variables (construct via Let) for use in the
+// WithMergeLet declares variables (construct via Assign) for use in the
 // whenMatched pipeline set by WithMergeWhenMatchedPipeline.
-func WithMergeLet(vars ...LetVar) Option[mergeOptions] {
+func WithMergeLet(vars ...SetField) Option[mergeOptions] {
 	return func(o *mergeOptions) { o.let = vars }
 }
 
@@ -1120,7 +1107,7 @@ func MergeStage(coll string, opts ...Option[mergeOptions]) Stage {
 		}
 	}
 	if o.let != nil {
-		doc = append(doc, bson.E{Key: "let", Value: letVarsDoc(o.let)})
+		doc = append(doc, bson.E{Key: "let", Value: setFieldsDoc(o.let)})
 	}
 	if o.whenMatched != nil {
 		doc = append(doc, bson.E{Key: "whenMatched", Value: o.whenMatched})
