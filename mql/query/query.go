@@ -38,7 +38,9 @@ type Option[T any] func(*T)
 // Number is the set of Go numeric types accepted where the MQL spec calls for
 // a number.
 type Number interface {
-	~int | ~int32 | ~int64 | ~float32 | ~float64
+	~int8 | ~int16 | ~int32 | ~int64 | ~int |
+		~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uint |
+		~float32 | ~float64
 }
 
 // All creates a FieldCondition matching arrays that contain all of the given
