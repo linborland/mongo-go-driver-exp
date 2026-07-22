@@ -11,10 +11,10 @@ import (
 
 // FieldCondition represents a condition applied to a single document field,
 // e.g. { $gt: value }. Construct via the operator functions (Eq, Gt, etc.).
-type FieldCondition struct{ doc bson.D }
+type FieldCondition bson.D
 
 // Filter represents a complete MongoDB query document, e.g. { field: { $gt: v } }.
-// Construct via Field or the logical combinators And and Or.
+// Construct via Field or the logical combinators (And, Or, etc.).
 type Filter bson.D
 
 // Field creates a Filter for the named field from one or more FieldConditions
@@ -26,7 +26,7 @@ type Filter bson.D
 func Field(name string, conds ...FieldCondition) Filter {
 	merged := bson.D{}
 	for _, c := range conds {
-		merged = append(merged, c.doc...)
+		merged = append(merged, c...)
 	}
 	return Filter{{Key: name, Value: merged}}
 }
@@ -45,15 +45,7 @@ type Number interface {
 // values: { $all: [ ... ] }. Values are usually plain scalars, but may also be
 // ElemMatch conditions to match arrays of embedded documents.
 func All(values ...any) FieldCondition {
-	arr := make(bson.A, len(values))
-	for i, v := range values {
-		if fc, ok := v.(FieldCondition); ok {
-			arr[i] = fc.doc
-		} else {
-			arr[i] = v
-		}
-	}
-	return FieldCondition{doc: bson.D{{Key: "$all", Value: arr}}}
+	return FieldCondition{{Key: "$all", Value: bson.A(values)}}
 }
 
 // And creates a Filter for logical AND: { $and: [ filter1, filter2, ... ] }.
@@ -90,27 +82,22 @@ func CenterSphere(center []float64, radius float64) Geometry {
 // to match arrays of embedded documents (e.g. query.Field("product", query.Eq("xyz")))
 // or FieldConditions to match scalar elements (e.g. query.Gte(80), query.Lt(85)).
 func ElemMatch[T Filter | FieldCondition](queries ...T) FieldCondition {
-	inner := bson.D{}
+	merged := bson.D{}
 	for _, q := range queries {
-		switch v := any(q).(type) {
-		case Filter:
-			inner = append(inner, v...)
-		case FieldCondition:
-			inner = append(inner, v.doc...)
-		}
+		merged = append(merged, q...)
 	}
-	return FieldCondition{doc: bson.D{{Key: "$elemMatch", Value: inner}}}
+	return FieldCondition{{Key: "$elemMatch", Value: merged}}
 }
 
 // Eq creates a FieldCondition for equality: { $eq: value }.
 func Eq(value any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$eq", Value: value}}}
+	return FieldCondition{{Key: "$eq", Value: value}}
 }
 
 // Exists creates a FieldCondition matching documents that have (or lack) the
 // field: { $exists: exists }.
 func Exists(exists bool) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$exists", Value: exists}}}
+	return FieldCondition{{Key: "$exists", Value: exists}}
 }
 
 // Geometry represents a geometry value supplied to the geospatial query
@@ -163,51 +150,51 @@ func GeoJSON[C Coordinates](geoType string, coordinates C, opts ...Option[geoJSO
 // given GeoJSON geometry: { $geoIntersects: { $geometry: ... } }. Use GeoJSON to
 // construct the geometry; $geoIntersects does not support the legacy shapes.
 func GeoIntersects(g Geometry) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$geoIntersects", Value: g.doc}}}
+	return FieldCondition{{Key: "$geoIntersects", Value: g.doc}}
 }
 
 // GeoWithin creates a FieldCondition matching geometries within the given
 // bounding geometry: { $geoWithin: { ... } }. Accepts a GeoJSON geometry or any
 // of the legacy shapes (Box, Center, CenterSphere, Polygon).
 func GeoWithin(g Geometry) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$geoWithin", Value: g.doc}}}
+	return FieldCondition{{Key: "$geoWithin", Value: g.doc}}
 }
 
 // Gt creates a FieldCondition for greater than: { $gt: value }.
 func Gt(value any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$gt", Value: value}}}
+	return FieldCondition{{Key: "$gt", Value: value}}
 }
 
 // Gte creates a FieldCondition for greater than or equal to: { $gte: value }.
 func Gte(value any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$gte", Value: value}}}
+	return FieldCondition{{Key: "$gte", Value: value}}
 }
 
 // In creates a FieldCondition matching any of the given values: { $in: [ ... ] }.
 func In(values ...any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$in", Value: bson.A(values)}}}
+	return FieldCondition{{Key: "$in", Value: bson.A(values)}}
 }
 
 // Lt creates a FieldCondition for less than: { $lt: value }.
 func Lt(value any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$lt", Value: value}}}
+	return FieldCondition{{Key: "$lt", Value: value}}
 }
 
 // Lte creates a FieldCondition for less than or equal to: { $lte: value }.
 func Lte(value any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$lte", Value: value}}}
+	return FieldCondition{{Key: "$lte", Value: value}}
 }
 
 // MaxDistance creates a FieldCondition limiting Near and NearSphere results to
 // at most the given distance from the center point: { $maxDistance: value }.
 func MaxDistance[T Number](value T) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$maxDistance", Value: value}}}
+	return FieldCondition{{Key: "$maxDistance", Value: value}}
 }
 
 // MinDistance creates a FieldCondition limiting Near and NearSphere results to
 // at least the given distance from the center point: { $minDistance: value }.
 func MinDistance[T Number](value T) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$minDistance", Value: value}}}
+	return FieldCondition{{Key: "$minDistance", Value: value}}
 }
 
 type nearOptions struct {
@@ -246,7 +233,7 @@ func nearDoc(g Geometry, opts []Option[nearOptions]) bson.D {
 
 // Ne creates a FieldCondition matching values not equal to value: { $ne: value }.
 func Ne(value any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$ne", Value: value}}}
+	return FieldCondition{{Key: "$ne", Value: value}}
 }
 
 // Near creates a FieldCondition matching geospatial objects in proximity to the
@@ -254,7 +241,7 @@ func Ne(value any) FieldCondition {
 // $maxDistance } }. Bounds are set via WithNearMinDistance and
 // WithNearMaxDistance.
 func Near(g Geometry, opts ...Option[nearOptions]) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$near", Value: nearDoc(g, opts)}}}
+	return FieldCondition{{Key: "$near", Value: nearDoc(g, opts)}}
 }
 
 // NearSphere creates a FieldCondition matching geospatial objects in proximity
@@ -262,12 +249,12 @@ func Near(g Geometry, opts ...Option[nearOptions]) FieldCondition {
 // $geometry: ..., $minDistance, $maxDistance } }. Bounds are set via
 // WithNearMinDistance and WithNearMaxDistance.
 func NearSphere(g Geometry, opts ...Option[nearOptions]) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$nearSphere", Value: nearDoc(g, opts)}}}
+	return FieldCondition{{Key: "$nearSphere", Value: nearDoc(g, opts)}}
 }
 
 // Nin creates a FieldCondition matching none of the given values: { $nin: [ ... ] }.
 func Nin(values ...any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$nin", Value: bson.A(values)}}}
+	return FieldCondition{{Key: "$nin", Value: bson.A(values)}}
 }
 
 // Nor creates a Filter for logical NOR, matching documents that fail every
@@ -286,15 +273,8 @@ func Nor(filters ...Filter) Filter {
 // e.g. query.Not(bson.Regex{Pattern: "^p.*"}) yields { $not: /^p.*/ }. MongoDB's
 // $not requires an operator expression or regex; it does not accept a plain
 // scalar value.
-func Not[T FieldCondition | bson.Regex](arg T) FieldCondition {
-	var value any
-	switch a := any(arg).(type) {
-	case FieldCondition:
-		value = a.doc
-	case bson.Regex:
-		value = a
-	}
-	return FieldCondition{doc: bson.D{{Key: "$not", Value: value}}}
+func Not[T FieldCondition | bson.Regex](value T) FieldCondition {
+	return FieldCondition{{Key: "$not", Value: value}}
 }
 
 // Or creates a Filter for logical OR: { $or: [ filter1, filter2, ... ] }.
@@ -315,12 +295,12 @@ func Polygon(points ...[]float64) Geometry {
 // Size creates a FieldCondition matching arrays with the given number of
 // elements: { $size: value }.
 func Size(value int) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$size", Value: value}}}
+	return FieldCondition{{Key: "$size", Value: value}}
 }
 
 // Type creates a FieldCondition matching documents where the field is one of the
 // specified BSON types: { $type: [ ... ] }. Each type may be an alias string or
 // numeric code. The verbose array form is always emitted.
 func Type(types ...any) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$type", Value: bson.A(types)}}}
+	return FieldCondition{{Key: "$type", Value: bson.A(types)}}
 }
