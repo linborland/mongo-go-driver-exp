@@ -35,14 +35,6 @@ func Field(name string, conds ...FieldCondition) Filter {
 // operator with type T.
 type Option[T any] func(*T)
 
-// Number is the set of Go numeric types accepted where the MQL spec calls for
-// a number.
-type Number interface {
-	~int8 | ~int16 | ~int32 | ~int64 | ~int |
-		~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uint |
-		~float32 | ~float64
-}
-
 // All creates a FieldCondition matching arrays that contain all of the given
 // values: { $all: [ ... ] }. Values are usually plain scalars, but may also be
 // ElemMatch conditions to match arrays of embedded documents.
@@ -69,28 +61,28 @@ type Bitmask interface {
 // which all of the given bit positions are 0: { $bitsAllClear: bitmask }. The
 // bitmask may be an int, a bson.Binary, or an array of bit positions.
 func BitsAllClear[T Bitmask](bitmask T) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$bitsAllClear", Value: bitmask}}}
+	return FieldCondition{{Key: "$bitsAllClear", Value: bitmask}}
 }
 
 // BitsAllSet creates a FieldCondition matching numeric or binary values in which
 // all of the given bit positions are 1: { $bitsAllSet: bitmask }. The bitmask
 // may be an int, a bson.Binary, or an array of bit positions.
 func BitsAllSet[T Bitmask](bitmask T) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$bitsAllSet", Value: bitmask}}}
+	return FieldCondition{{Key: "$bitsAllSet", Value: bitmask}}
 }
 
 // BitsAnyClear creates a FieldCondition matching numeric or binary values in
 // which any of the given bit positions are 0: { $bitsAnyClear: bitmask }. The
 // bitmask may be an int, a bson.Binary, or an array of bit positions.
 func BitsAnyClear[T Bitmask](bitmask T) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$bitsAnyClear", Value: bitmask}}}
+	return FieldCondition{{Key: "$bitsAnyClear", Value: bitmask}}
 }
 
 // BitsAnySet creates a FieldCondition matching numeric or binary values in which
 // any of the given bit positions are 1: { $bitsAnySet: bitmask }. The bitmask
 // may be an int, a bson.Binary, or an array of bit positions.
 func BitsAnySet[T Bitmask](bitmask T) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$bitsAnySet", Value: bitmask}}}
+	return FieldCondition{{Key: "$bitsAnySet", Value: bitmask}}
 }
 
 // Box creates a legacy rectangular box geometry ($box) from the bottom-left and
@@ -241,20 +233,20 @@ func Lte(value any) FieldCondition {
 
 // MaxDistance creates a FieldCondition limiting Near and NearSphere results to
 // at most the given distance from the center point: { $maxDistance: value }.
-func MaxDistance[T Number](value T) FieldCondition {
+func MaxDistance[T int | float64](value T) FieldCondition {
 	return FieldCondition{{Key: "$maxDistance", Value: value}}
 }
 
 // MinDistance creates a FieldCondition limiting Near and NearSphere results to
 // at least the given distance from the center point: { $minDistance: value }.
-func MinDistance[T Number](value T) FieldCondition {
+func MinDistance[T int | float64](value T) FieldCondition {
 	return FieldCondition{{Key: "$minDistance", Value: value}}
 }
 
 // Mod creates a FieldCondition that performs a modulo operation on the field
 // and matches the specified result: { $mod: [ divisor, remainder ] }.
-func Mod[D, R Number](divisor D, remainder R) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$mod", Value: bson.A{divisor, remainder}}}}
+func Mod(divisor int, remainder int) FieldCondition {
+	return FieldCondition{{Key: "$mod", Value: bson.A{divisor, remainder}}}
 }
 
 type nearOptions struct {
@@ -264,13 +256,13 @@ type nearOptions struct {
 
 // WithNearMinDistance limits Near/NearSphere results to at least the given
 // distance (in meters) from the center point.
-func WithNearMinDistance[T Number](d T) Option[nearOptions] {
+func WithNearMinDistance[T int | float64](d T) Option[nearOptions] {
 	return func(opts *nearOptions) { opts.minDistance = d }
 }
 
 // WithNearMaxDistance limits Near/NearSphere results to at most the given
 // distance (in meters) from the center point.
-func WithNearMaxDistance[T Number](d T) Option[nearOptions] {
+func WithNearMaxDistance[T int | float64](d T) Option[nearOptions] {
 	return func(opts *nearOptions) { opts.maxDistance = d }
 }
 
@@ -355,7 +347,7 @@ func Polygon(points ...[]float64) Geometry {
 // Regex creates a FieldCondition matching values against a regular expression:
 // { $regex: regex }. Use the Options field of bson.Regex for flags like "i".
 func Regex(regex bson.Regex) FieldCondition {
-	return FieldCondition{doc: bson.D{{Key: "$regex", Value: regex}}}
+	return FieldCondition{{Key: "$regex", Value: regex}}
 }
 
 // SampleRate creates a Filter that randomly selects documents at the given rate

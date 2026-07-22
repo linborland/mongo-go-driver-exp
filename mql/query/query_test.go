@@ -904,7 +904,7 @@ func TestMaxDistance(t *testing.T) {
 
 func TestMinDistance(t *testing.T) {
 	got := agg.Pipeline{
-		agg.MatchStage(query.Field("loc", query.MinDistance(1000))),
+		agg.MatchStage(query.Field("loc", query.MinDistance((1000)))),
 	}
 	want := bson.A{
 		bson.D{{Key: "$match", Value: bson.D{
@@ -923,32 +923,6 @@ func TestMod_SelectDocs(t *testing.T) {
 	want := bson.A{
 		bson.D{{Key: "$match", Value: bson.D{
 			{Key: "qty", Value: bson.D{{Key: "$mod", Value: bson.A{4, 0}}}},
-		}}},
-	}
-	assertPipelineEqual(t, got, want)
-}
-
-func TestMod_FloatingPointArguments(t *testing.T) {
-	got := agg.Pipeline{
-		agg.MatchStage(
-			query.Field("qty", query.Mod(4.0, 0)),
-		),
-		agg.MatchStage(
-			query.Field("qty", query.Mod(4.5, 0)),
-		),
-		agg.MatchStage(
-			query.Field("qty", query.Mod(4.99, 0)),
-		),
-	}
-	want := bson.A{
-		bson.D{{Key: "$match", Value: bson.D{
-			{Key: "qty", Value: bson.D{{Key: "$mod", Value: bson.A{4.0, 0}}}},
-		}}},
-		bson.D{{Key: "$match", Value: bson.D{
-			{Key: "qty", Value: bson.D{{Key: "$mod", Value: bson.A{4.5, 0}}}},
-		}}},
-		bson.D{{Key: "$match", Value: bson.D{
-			{Key: "qty", Value: bson.D{{Key: "$mod", Value: bson.A{4.99, 0}}}},
 		}}},
 	}
 	assertPipelineEqual(t, got, want)
