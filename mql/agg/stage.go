@@ -500,13 +500,14 @@ func DensifyStage[T Number](field string, step T, bounds DensifyBounds, opts ...
 
 // --- $documents ---
 
-// DocumentsStage produces a $documents stage that emits the given literal
-// documents as the pipeline input.
-//
-// The spec also permits any expression that resolves to an array of objects
-// (e.g. $$NOW-based expressions); that variant is not modeled here.
-func DocumentsStage(docs ...bson.D) Stage {
-	return Stage{{Key: "$documents", Value: docs}}
+// DocumentsStage produces a $documents stage that emits the documents the given
+// expression resolves to. documents may be a literal array of objects (e.g.
+// bson.A{bson.D{...}, ...}) or any expression that resolves to an array of
+// objects — a system variable such as "$$SEARCH_META", a Let expression, or a
+// variable in scope from a $lookup. Expressions that reference the current
+// document (e.g. "$myField" or "$$ROOT") resolve to an error at runtime.
+func DocumentsStage[T ArrayResolver](documents T) Stage {
+	return Stage{{Key: "$documents", Value: documents}}
 }
 
 // --- $facet ---

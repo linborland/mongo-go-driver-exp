@@ -221,7 +221,7 @@ func TestBucketStage_UseBucketWithFacetToBucketByMultipleFields(t *testing.T) {
 
 // --- $bucketAuto ---
 
-func TestBucketAutoStage(t *testing.T) {
+func TestBucketAutoStage_Example(t *testing.T) {
 	got := agg.Pipeline{
 		agg.BucketAutoStage(
 			"$price",
@@ -232,6 +232,50 @@ func TestBucketAutoStage(t *testing.T) {
 		bson.D{{Key: "$bucketAuto", Value: bson.D{
 			{Key: "groupBy", Value: "$price"},
 			{Key: "buckets", Value: 4},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestBucketAutoStage_WithGranularity(t *testing.T) {
+	got := agg.Pipeline{
+		agg.BucketAutoStage(
+			"$price",
+			4,
+			agg.WithBucketAutoGranularity("R5"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$bucketAuto", Value: bson.D{
+			{Key: "groupBy", Value: "$price"},
+			{Key: "buckets", Value: 4},
+			{Key: "granularity", Value: "R5"},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestBucketAutoStage_WithOutputAndGranularity(t *testing.T) {
+	got := agg.Pipeline{
+		agg.BucketAutoStage(
+			"$price",
+			4,
+			agg.WithBucketAutoGranularity("POWERSOF2"),
+			agg.WithBucketAutoOutput(
+				agg.Accumulate("count", agg.SumAccumulator(1)),
+				agg.Accumulate("averagePrice", agg.AvgAccumulator("$price")),
+			),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$bucketAuto", Value: bson.D{
+			{Key: "groupBy", Value: "$price"},
+			{Key: "buckets", Value: 4},
+			{Key: "output", Value: bson.D{
+				{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+				{Key: "averagePrice", Value: bson.D{{Key: "$avg", Value: "$price"}}},
+			}},
+			{Key: "granularity", Value: "POWERSOF2"},
 		}}},
 	}
 	assertPipelineEqual(t, got, want)
@@ -630,11 +674,11 @@ func TestDensifyStage_PartitionBounds(t *testing.T) {
 
 func TestDocumentsStage_TestAPipelineStage(t *testing.T) {
 	got := agg.Pipeline{
-		agg.DocumentsStage(
+		agg.DocumentsStage(bson.A{
 			bson.D{{Key: "x", Value: 10}},
 			bson.D{{Key: "x", Value: 2}},
 			bson.D{{Key: "x", Value: 5}},
-		),
+		}),
 		agg.BucketAutoStage("$x", 4),
 	}
 	want := bson.A{
@@ -653,7 +697,7 @@ func TestDocumentsStage_TestAPipelineStage(t *testing.T) {
 
 // --- $facet ---
 
-func TestFacetStage_Example(t *testing.T) {
+func TestFacetStage(t *testing.T) {
 	got := agg.Pipeline{
 		agg.FacetStage(
 			agg.Facet("categorizedByTags",
