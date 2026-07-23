@@ -215,9 +215,9 @@ func In(values ...any) FieldCondition {
 	return FieldCondition{{Key: "$in", Value: bson.A(values)}}
 }
 
-// JsonSchema creates a Filter that validates documents against the given JSON
+// JSONSchema creates a Filter that validates documents against the given JSON
 // Schema: { $jsonSchema: schema }.
-func JsonSchema(schema any) Filter {
+func JSONSchema(schema any) Filter {
 	return Filter{{Key: "$jsonSchema", Value: schema}}
 }
 
@@ -230,6 +230,18 @@ func Lt(value any) FieldCondition {
 func Lte(value any) FieldCondition {
 	return FieldCondition{{Key: "$lte", Value: value}}
 }
+
+// MaxDistance limits results to within d of the query point — radians for a
+// legacy 2d index, meters for GeoJSON on a 2dsphere index. d must be
+// non-negative.
+//
+// The server treats the distance as a double and clamps it to the maximum
+// distance on the sphere (~2.0037e7 m, i.e. an antipodal great-circle
+// distance; a few radians for legacy indexes). Any larger value matches the
+// whole sphere, so the precision limits of float64 above 2^53 and the range
+// of int64 are never reachable here — even int32 far exceeds any meaningful
+// distance. The Number constraint (int/float kinds, no unsigned) is chosen
+// for call-site ergonomics, not range.
 
 // MaxDistance creates a FieldCondition limiting Near and NearSphere results to
 // at most the given distance from the center point: { $maxDistance: value }.

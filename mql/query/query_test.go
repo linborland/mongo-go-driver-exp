@@ -831,7 +831,7 @@ func TestIn_RegularExpression(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-func TestJsonSchema(t *testing.T) {
+func TestJSONSchema(t *testing.T) {
 	schema := bson.D{
 		{Key: "required", Value: bson.A{"name", "major", "gpa", "address"}},
 		{Key: "properties", Value: bson.D{
@@ -851,7 +851,7 @@ func TestJsonSchema(t *testing.T) {
 	}
 	got := agg.Pipeline{
 		agg.MatchStage(
-			query.JsonSchema(schema),
+			query.JSONSchema(schema),
 		),
 	}
 	want := bson.A{
