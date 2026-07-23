@@ -18,7 +18,6 @@ func Acosh[T NumberResolver](expr T) NumberExpr {
 }
 
 // Add returns the sum of the given numeric expressions ($add).
-// TODO: $add also accepts a date + milliseconds to produce a date;
 // that variant is not yet modeled here.
 func Add[T NumberResolver, U NumberResolver](value T, values ...U) NumberExpr {
 	v := make([]any, len(values)+1)
@@ -1728,7 +1727,6 @@ func SubstrCP[T StringResolver, U NumberResolver, V NumberResolver](str T, start
 }
 
 // Subtract returns a minus b ($subtract).
-// TODO: $subtract also supports date-date → millis and date-millis → date;
 // those variants are not yet modeled here.
 func Subtract[T NumberResolver, U NumberResolver](a T, b U) NumberExpr {
 	return NumberExpr{expr: bson.D{{Key: "$subtract", Value: bson.A{a, b}}}}

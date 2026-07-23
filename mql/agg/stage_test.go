@@ -1092,17 +1092,96 @@ func TestGroupStage_GroupTitlesByYear(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestGroupStage_RetrieveDistinctValues
-// spec test is $group with _id only and no accumulator fields; ready to implement
+func TestGroupStage_RetrieveDistinctValues(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage("$item"),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$item"},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestGroupStage_GroupByItemHaving
-// ready to implement; uses SumAccumulator(Multiply(...)) followed by MatchStage
+func TestGroupStage_GroupByItemHaving(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage("$item",
+			agg.Accumulate("totalSaleAmount", agg.SumAccumulator(agg.Multiply("$price", "$quantity"))),
+		),
+		agg.MatchStage(query.Field("totalSaleAmount", query.Gte(100))),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$item"},
+			{Key: "totalSaleAmount", Value: bson.D{{Key: "$sum", Value: bson.D{
+				{Key: "$multiply", Value: bson.A{"$price", "$quantity"}},
+			}}}},
+		}}},
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "totalSaleAmount", Value: bson.D{{Key: "$gte", Value: 100}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestGroupStage_CalculateCountSumAvgWithDates
-// after $dateToString expression operator is implemented
+func TestGroupStage_CalculateCountSumAvgWithDates(t *testing.T) {
+	lower := time.Date(2014, 1, 1, 0, 0, 0, 0, time.UTC)
+	upper := time.Date(2015, 1, 1, 0, 0, 0, 0, time.UTC)
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("date", query.Gte(lower), query.Lt(upper))),
+		agg.GroupStage(
+			agg.DateToString("$date", agg.WithDateToStringFormat("%Y-%m-%d")),
+			agg.Accumulate("totalSaleAmount", agg.SumAccumulator(agg.Multiply("$price", "$quantity"))),
+			agg.Accumulate("averageQuantity", agg.AvgAccumulator("$quantity")),
+			agg.Accumulate("count", agg.SumAccumulator(1)),
+		),
+		agg.SortStage(agg.Sort("totalSaleAmount", agg.Desc)),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "date", Value: bson.D{
+				{Key: "$gte", Value: lower},
+				{Key: "$lt", Value: upper},
+			}},
+		}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "$dateToString", Value: bson.D{
+				{Key: "date", Value: "$date"},
+				{Key: "format", Value: "%Y-%m-%d"},
+			}}}},
+			{Key: "totalSaleAmount", Value: bson.D{{Key: "$sum", Value: bson.D{
+				{Key: "$multiply", Value: bson.A{"$price", "$quantity"}},
+			}}}},
+			{Key: "averageQuantity", Value: bson.D{{Key: "$avg", Value: "$quantity"}}},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+		bson.D{{Key: "$sort", Value: bson.D{{Key: "totalSaleAmount", Value: -1}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestGroupStage_GroupByNullSumMultiply
-// ready to implement; existing TestGroupStage_GroupByNull incorrectly duplicates TestGroupStage_CalculateCountSumAvg
+func TestGroupStage_GroupByNullSumMultiply(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			agg.Null,
+			agg.Accumulate("totalSaleAmount", agg.SumAccumulator(agg.Multiply("$price", "$quantity"))),
+			agg.Accumulate("averageQuantity", agg.AvgAccumulator("$quantity")),
+			agg.Accumulate("count", agg.SumAccumulator(1)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: nil},
+			{Key: "totalSaleAmount", Value: bson.D{{Key: "$sum", Value: bson.D{
+				{Key: "$multiply", Value: bson.A{"$price", "$quantity"}},
+			}}}},
+			{Key: "averageQuantity", Value: bson.D{{Key: "$avg", Value: "$quantity"}}},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestGroupStage_GroupDocumentsByAuthor(t *testing.T) {
 	got := agg.Pipeline{
@@ -1367,8 +1446,7 @@ func TestLookupStage_UncorrelatedSubquery(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestLookupStage_CorrelatedSubquery (uses WithLookupLet plus a
-// $match with the $expr query operator, which is not implemented yet)
+// TODO: implement TestLookupStage_CorrelatedSubquery when $expr is implemented
 
 // --- $match ---
 
@@ -1388,8 +1466,34 @@ func TestMatchStage_EqualityMatch(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestMatchStage_PerformCount
-// after multi-condition field queries are supported in the query package
+func TestMatchStage_PerformCount(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Or(
+			query.Field("score", query.Gt(70), query.Lt(90)),
+			query.Field("views", query.Gte(1000)),
+		)),
+		agg.GroupStage(
+			agg.Null,
+			agg.Accumulate("count", agg.SumAccumulator(1)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "$or", Value: bson.A{
+				bson.D{{Key: "score", Value: bson.D{
+					{Key: "$gt", Value: 70},
+					{Key: "$lt", Value: 90},
+				}}},
+				bson.D{{Key: "views", Value: bson.D{{Key: "$gte", Value: 1000}}}},
+			}},
+		}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: nil},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestMatchStage_EmptyFieldCondition(t *testing.T) {
 	got := agg.Pipeline{
@@ -1653,14 +1757,13 @@ func TestProjectStage_IncludeSpecificFieldsFromEmbeddedDocs(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: Add computed field leadActor: { $arrayElemAt: [ "$cast", 0 ] }
-// when arrayElemAt operator is implemented
 func TestProjectStage_IncludeComputedFields(t *testing.T) {
 	got := agg.Pipeline{
 		agg.MatchStage(query.Field("title", query.Eq("The Great Train Robbery"))),
 		agg.ProjectStage(
 			agg.Include("title"),
 			agg.Compute("releaseYear", "$year"),
+			agg.Compute("leadActor", agg.ArrayElemAt("$cast", 0)),
 		),
 		agg.LimitStage(1),
 	}
@@ -1669,29 +1772,110 @@ func TestProjectStage_IncludeComputedFields(t *testing.T) {
 		bson.D{{Key: "$project", Value: bson.D{
 			{Key: "title", Value: 1},
 			{Key: "releaseYear", Value: "$year"},
+			{Key: "leadActor", Value: bson.D{{Key: "$arrayElemAt", Value: bson.A{"$cast", 0}}}},
 		}}},
 		bson.D{{Key: "$limit", Value: 1}},
 	}
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestProjectStage_ConditionallyExcludeFields
-// after $cond operator is implemented
+func TestProjectStage_ConditionallyExcludeFields(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("title"),
+			agg.Include("author.first"),
+			agg.Include("author.last"),
+			agg.Compute("author.middle", agg.Cond(
+				agg.Eq("", "$author.middle"),
+				"$$REMOVE",
+				"$author.middle",
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "title", Value: 1},
+			{Key: "author.first", Value: 1},
+			{Key: "author.last", Value: 1},
+			{Key: "author.middle", Value: bson.D{{Key: "$cond", Value: bson.D{
+				{Key: "if", Value: bson.D{{Key: "$eq", Value: bson.A{"", "$author.middle"}}}},
+				{Key: "then", Value: "$$REMOVE"},
+				{Key: "else", Value: "$author.middle"},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestProjectStage_IncludeComputedFieldsSubstr
-// after $substr operator is implemented
+func TestProjectStage_IncludeComputedFieldsSubstr(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("title"),
+			agg.Compute("isbn", bson.D{
+				{Key: "prefix", Value: agg.Substr("$isbn", 0, 3)},
+				{Key: "group", Value: agg.Substr("$isbn", 3, 2)},
+				{Key: "publisher", Value: agg.Substr("$isbn", 5, 4)},
+				{Key: "title", Value: agg.Substr("$isbn", 9, 3)},
+				{Key: "checkDigit", Value: agg.Substr("$isbn", 12, 1)},
+			}),
+			agg.Compute("lastName", "$author.last"),
+			agg.Compute("copiesSold", "$copies"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "title", Value: 1},
+			{Key: "isbn", Value: bson.D{
+				{Key: "prefix", Value: bson.D{{Key: "$substr", Value: bson.A{"$isbn", 0, 3}}}},
+				{Key: "group", Value: bson.D{{Key: "$substr", Value: bson.A{"$isbn", 3, 2}}}},
+				{Key: "publisher", Value: bson.D{{Key: "$substr", Value: bson.A{"$isbn", 5, 4}}}},
+				{Key: "title", Value: bson.D{{Key: "$substr", Value: bson.A{"$isbn", 9, 3}}}},
+				{Key: "checkDigit", Value: bson.D{{Key: "$substr", Value: bson.A{"$isbn", 12, 1}}}},
+			}},
+			{Key: "lastName", Value: "$author.last"},
+			{Key: "copiesSold", Value: "$copies"},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestProjectStage_ProjectNewArrayFields
-// after array-literal ProjectionField variant is implemented
+func TestProjectStage_ProjectNewArrayFields(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("myArray", bson.A{"$x", "$y"}),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "myArray", Value: bson.A{"$x", "$y"}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $redact ---
 
-// TODO: implement TestRedactStage_EvaluateAccessAtEveryDocumentLevel
-// after the $cond expression operator is implemented (the spec example uses
-// $cond with $$DESCEND / $$PRUNE system variables)
+// TODO: implement TestRedactStage_EvaluateAccessAtEveryDocumentLevel when $setIntersection supports mixed argument types
 
-// TODO: implement TestRedactStage_ExcludeAllFieldsAtAGivenLevel
-// after the $cond expression operator is implemented
+func TestRedactStage_ExcludeAllFieldsAtAGivenLevel(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("status", query.Eq("A"))),
+		agg.RedactStage(agg.Cond(
+			agg.Eq("$level", 5),
+			"$$PRUNE",
+			"$$DESCEND",
+		)),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{{Key: "status", Value: bson.D{{Key: "$eq", Value: "A"}}}}}},
+		bson.D{{Key: "$redact", Value: bson.D{{Key: "$cond", Value: bson.D{
+			{Key: "if", Value: bson.D{{Key: "$eq", Value: bson.A{"$level", 5}}}},
+			{Key: "then", Value: "$$PRUNE"},
+			{Key: "else", Value: "$$DESCEND"},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $replaceRoot ---
 
@@ -1817,14 +2001,57 @@ func TestSetStage_OverwriteExistingField(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSetStage_UsingTwoSetStages
-// after $sum expression operator is implemented
+func TestSetStage_UsingTwoSetStages(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetStage(
+			agg.Assign("totalHomework", agg.Sum("$homework")),
+			agg.Assign("totalQuiz", agg.Sum("$quiz")),
+		),
+		agg.SetStage(
+			agg.Assign("totalScore", agg.Add("$totalHomework", "$totalQuiz", "$extraCredit")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "totalHomework", Value: bson.D{{Key: "$sum", Value: bson.A{"$homework"}}}},
+			{Key: "totalQuiz", Value: bson.D{{Key: "$sum", Value: bson.A{"$quiz"}}}},
+		}}},
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "totalScore", Value: bson.D{{Key: "$add", Value: bson.A{"$totalHomework", "$totalQuiz", "$extraCredit"}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestSetStage_AddElementToArray
-// after $concatArrays expression operator is implemented
+func TestSetStage_AddElementToArray(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("_id", query.Eq(1))),
+		agg.SetStage(
+			agg.Assign("homework", agg.ConcatArrays("$homework", []int{7})),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{{Key: "_id", Value: bson.D{{Key: "$eq", Value: 1}}}}}},
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "homework", Value: bson.D{{Key: "$concatArrays", Value: bson.A{"$homework", bson.A{7}}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestSetStage_CreatingNewFieldWithExistingFields
-// after $avg expression operator is implemented
+func TestSetStage_CreatingNewFieldWithExistingFields(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetStage(
+			agg.Assign("quizAverage", agg.Avg("$quiz")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "quizAverage", Value: bson.D{{Key: "$avg", Value: bson.A{"$quiz"}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $setWindowFields ---
 
@@ -1948,8 +2175,7 @@ func TestSortStage_AscendingDescendingSort(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSortStage_TextScoreMetadataSort
-// after $meta sort modifier and $text query operator are implemented
+// TODO: implement TestSortStage_TextScoreMetadataSort when $text is implemented
 
 // --- $sortByCount ---
 

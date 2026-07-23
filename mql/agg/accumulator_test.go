@@ -153,8 +153,31 @@ func TestAddToSetAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestAddToSetAccumulator_UseInSetWindowFieldsStage
-// after SetWindowFieldsStage is implemented
+func TestAddToSetAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("cakeTypesForState", agg.AddToSetAccumulator("$type"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "cakeTypesForState", Value: bson.D{
+					{Key: "$addToSet", Value: "$type"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $avg ---
 
@@ -176,8 +199,31 @@ func TestAvgAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestAvgAccumulator_UseInSetWindowFieldsStage
-// after SetWindowFieldsStage is implemented
+func TestAvgAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("averageQuantityForState", agg.AvgAccumulator("$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "averageQuantityForState", Value: bson.D{
+					{Key: "$avg", Value: "$quantity"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $bottom ---
 
@@ -279,9 +325,6 @@ func TestBottomNAccumulator_FindThreeLowestScoreDocsAcrossMultipleGames(t *testi
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestBottomNAccumulator_FindThreeLowestScoreDocsAcrossMultipleGames
-// after $cond operator is implemented
-
 // --- $concatArrays ---
 
 func TestConcatArraysAccumulator_WarehouseCollection(t *testing.T) {
@@ -317,38 +360,255 @@ func TestCountAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestCount_UseInGroupStage
-// after SetWindowFieldsStage is implemented
+func TestCountAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("countNumberOfDocumentsForState", agg.CountAccumulator(),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "countNumberOfDocumentsForState", Value: bson.D{
+					{Key: "$count", Value: bson.D{}},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $covariancePop ---
 
-// TODO: implement covariancePop tests
-// after SetWindowFieldsStage is implemented
+func TestCovariancePopAccumulator_Example(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("covariancePopForState",
+					agg.CovariancePopAccumulator(agg.Year("$orderDate"), "$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "covariancePopForState", Value: bson.D{
+					{Key: "$covariancePop", Value: bson.A{
+						bson.D{{Key: "$year", Value: bson.D{{Key: "date", Value: "$orderDate"}}}},
+						"$quantity",
+					}},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $covarianceSamp ---
 
-// TODO: implement covarianceSamp tests
-// after SetWindowFieldsStage is implemented
+func TestCovarianceSampAccumulator_Example(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("covarianceSampForState",
+					agg.CovarianceSampAccumulator(agg.Year("$orderDate"), "$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "covarianceSampForState", Value: bson.D{
+					{Key: "$covarianceSamp", Value: bson.A{
+						bson.D{{Key: "$year", Value: bson.D{{Key: "date", Value: "$orderDate"}}}},
+						"$quantity",
+					}},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $denseRank ---
 
-// TODO: implement denseRank tests
-// after SetWindowFieldsStage is implemented
+func TestDenseRankAccumulator_DenseRankPartitionsByAnIntegerField(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("denseRankQuantityForState", agg.DenseRankAccumulator()),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("quantity", agg.Desc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "quantity", Value: int32(-1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "denseRankQuantityForState", Value: bson.D{{Key: "$denseRank", Value: bson.D{}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestDenseRankAccumulator_DenseRankPartitionsByADateField(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("denseRankOrderDateForState", agg.DenseRankAccumulator()),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "denseRankOrderDateForState", Value: bson.D{{Key: "$denseRank", Value: bson.D{}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $derivative ---
 
-// TODO: implement derivative tests
-// after SetWindowFieldsStage is implemented
+func TestDerivativeAccumulator_Example(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("truckAverageSpeed",
+					agg.DerivativeAccumulator("$miles", agg.WithDerivativeUnit("hour")),
+					agg.WithWindowRange(agg.WindowOffset(-30), agg.WindowOffset(0)),
+					agg.WithWindowRangeUnit("second")),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$truckID"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("timeStamp", agg.Asc)),
+		),
+		agg.MatchStage(query.Field("truckAverageSpeed", query.Gt(50))),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$truckID"},
+			{Key: "sortBy", Value: bson.D{{Key: "timeStamp", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "truckAverageSpeed", Value: bson.D{
+					{Key: "$derivative", Value: bson.D{
+						{Key: "input", Value: "$miles"},
+						{Key: "unit", Value: "hour"},
+					}},
+					{Key: "window", Value: bson.D{
+						{Key: "range", Value: bson.A{-30, 0}},
+						{Key: "unit", Value: "second"},
+					}},
+				}},
+			}},
+		}}},
+		bson.D{{Key: "$match", Value: bson.D{{Key: "truckAverageSpeed", Value: bson.D{{Key: "$gt", Value: 50}}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $documentNumber ---
 
-// TODO: implement documentNumber tests
-// after SetWindowFieldsStage is implemented
+func TestDocumentNumberAccumulator_DocumentNumberForEachState(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("documentNumberForState", agg.DocumentNumberAccumulator()),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("quantity", agg.Desc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "quantity", Value: int32(-1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "documentNumberForState", Value: bson.D{{Key: "$documentNumber", Value: bson.D{}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $expMovingAvg ---
 
-// TODO: implement expMovingAvg tests
-// after SetWindowFieldsStage is implemented
+func TestExpMovingAvgAccumulator_ExponentialMovingAverageUsingN(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("expMovingAvgForStock", agg.ExpMovingAvgNAccumulator("$price", 2)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$stock"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("date", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$stock"},
+			{Key: "sortBy", Value: bson.D{{Key: "date", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "expMovingAvgForStock", Value: bson.D{{Key: "$expMovingAvg", Value: bson.D{
+					{Key: "input", Value: "$price"},
+					{Key: "N", Value: int32(2)},
+				}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestExpMovingAvgAccumulator_ExponentialMovingAverageUsingAlpha(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("expMovingAvgForStock", agg.ExpMovingAvgAlphaAccumulator("$price", 0.75)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$stock"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("date", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$stock"},
+			{Key: "sortBy", Value: bson.D{{Key: "date", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "expMovingAvgForStock", Value: bson.D{{Key: "$expMovingAvg", Value: bson.D{
+					{Key: "input", Value: "$price"},
+					{Key: "alpha", Value: 0.75},
+				}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $first ---
 
@@ -373,13 +633,66 @@ func TestFirstAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestFirstAccumulator_UseInSetMovingFieldStage tests
-// after SetWindowFieldsStage is implemented
+func TestFirstAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("firstOrderTypeForState", agg.FirstAccumulator("$type"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "firstOrderTypeForState", Value: bson.D{
+					{Key: "$first", Value: "$type"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $firstN ---
 
-// TODO: implement TestFirstNAccumulator_NullAndMissingValues
-// after $documents stage is implemented
+func TestFirstNAccumulator_NullAndMissingValues(t *testing.T) {
+	got := agg.Pipeline{
+		agg.DocumentsStage(bson.A{
+			bson.D{{Key: "playerId", Value: "PlayerA"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: 1}},
+			bson.D{{Key: "playerId", Value: "PlayerB"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: 2}},
+			bson.D{{Key: "playerId", Value: "PlayerC"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: 3}},
+			bson.D{{Key: "playerId", Value: "PlayerD"}, {Key: "gameId", Value: "G1"}},
+			bson.D{{Key: "playerId", Value: "PlayerE"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: nil}},
+		}),
+		agg.GroupStage(
+			"$gameId",
+			agg.Accumulate("firstFiveScores", agg.FirstNAccumulator("$score", 5)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$documents", Value: bson.A{
+			bson.D{{Key: "playerId", Value: "PlayerA"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: 1}},
+			bson.D{{Key: "playerId", Value: "PlayerB"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: 2}},
+			bson.D{{Key: "playerId", Value: "PlayerC"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: 3}},
+			bson.D{{Key: "playerId", Value: "PlayerD"}, {Key: "gameId", Value: "G1"}},
+			bson.D{{Key: "playerId", Value: "PlayerE"}, {Key: "gameId", Value: "G1"}, {Key: "score", Value: nil}},
+		}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$gameId"},
+			{Key: "firstFiveScores", Value: bson.D{{Key: "$firstN", Value: bson.D{
+				{Key: "input", Value: "$score"},
+				{Key: "n", Value: 5},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestFirstNAccumulator_FindFirstThreePlayerScoresForSingleGame(t *testing.T) {
 	got := agg.Pipeline{
@@ -451,13 +764,67 @@ func TestFirstNAccumulator_UsingSortWithFirstN(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestFirstNAccumulator_ComputeNBasedOnGroupKey
-// after $cond operator is implemented
+func TestFirstNAccumulator_ComputeNBasedOnGroupKey(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			bson.D{{Key: "gameId", Value: "$gameId"}},
+			agg.Accumulate("gamescores", agg.FirstNAccumulator(
+				"$score",
+				agg.Cond(agg.Eq("$gameId", "G2"), 1, 3),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "gameId", Value: "$gameId"}}},
+			{Key: "gamescores", Value: bson.D{{Key: "$firstN", Value: bson.D{
+				{Key: "input", Value: "$score"},
+				{Key: "n", Value: bson.D{{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$eq", Value: bson.A{"$gameId", "G2"}}}},
+					{Key: "then", Value: 1},
+					{Key: "else", Value: 3},
+				}}}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $integral ---
 
-// TODO: implement integral tests
-// after SetWindowFieldsStage is implemented
+func TestIntegralAccumulator_Example(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("powerMeterKilowattHours",
+					agg.IntegralAccumulator("$kilowatts", agg.WithIntegralUnit("hour")),
+					agg.WithWindowRange(agg.WindowUnbounded, agg.WindowCurrent),
+					agg.WithWindowRangeUnit("hour")),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$powerMeterID"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("timeStamp", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$powerMeterID"},
+			{Key: "sortBy", Value: bson.D{{Key: "timeStamp", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "powerMeterKilowattHours", Value: bson.D{
+					{Key: "$integral", Value: bson.D{
+						{Key: "input", Value: "$kilowatts"},
+						{Key: "unit", Value: "hour"},
+					}},
+					{Key: "window", Value: bson.D{
+						{Key: "range", Value: bson.A{"unbounded", "current"}},
+						{Key: "unit", Value: "hour"},
+					}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $last ---
 
@@ -485,8 +852,31 @@ func TestLastAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestLastAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestLastAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("lastOrderTypeForState", agg.LastAccumulator("$type"),
+					agg.WithWindowDocuments(agg.WindowCurrent, agg.WindowUnbounded)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "lastOrderTypeForState", Value: bson.D{
+					{Key: "$last", Value: "$type"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"current", "unbounded"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $lastN ---
 
@@ -560,18 +950,97 @@ func TestLastNAccumulator_UsingSortWithLastN(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestLastNAccumulator_ComputeNBasedOnGroupKey
-// after $cond operator is implemented
+func TestLastNAccumulator_ComputeNBasedOnGroupKey(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			bson.D{{Key: "gameId", Value: "$gameId"}},
+			agg.Accumulate("gamescores", agg.LastNAccumulator(
+				"$score",
+				agg.Cond(agg.Eq("$gameId", "G2"), 1, 3),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "gameId", Value: "$gameId"}}},
+			{Key: "gamescores", Value: bson.D{{Key: "$lastN", Value: bson.D{
+				{Key: "input", Value: "$score"},
+				{Key: "n", Value: bson.D{{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$eq", Value: bson.A{"$gameId", "G2"}}}},
+					{Key: "then", Value: 1},
+					{Key: "else", Value: 3},
+				}}}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $linearFill ---
 
-// TODO: implement linearFill tests
-// after SetWindowFieldsStage is implemented
+func TestLinearFillAccumulator_FillMissingValuesWithLinearInterpolation(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("price", agg.LinearFillAccumulator("$price")),
+			},
+			agg.WithSetWindowFieldsSortBy(agg.Sort("time", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "sortBy", Value: bson.D{{Key: "time", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "price", Value: bson.D{{Key: "$linearFill", Value: "$price"}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestLinearFillAccumulator_UseMultipleFillMethodsInASingleStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("linearFillPrice", agg.LinearFillAccumulator("$price")),
+				agg.WindowOutput("locfPrice", agg.LocfAccumulator("$price")),
+			},
+			agg.WithSetWindowFieldsSortBy(agg.Sort("time", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "sortBy", Value: bson.D{{Key: "time", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "linearFillPrice", Value: bson.D{{Key: "$linearFill", Value: "$price"}}},
+				{Key: "locfPrice", Value: bson.D{{Key: "$locf", Value: "$price"}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $locf ---
 
-// TODO: implement locf tests
-// after SetWindowFieldsStage is implemented
+func TestLocfAccumulator_FillMissingValuesWithTheLastObservedValue(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("price", agg.LocfAccumulator("$price")),
+			},
+			agg.WithSetWindowFieldsSortBy(agg.Sort("time", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "sortBy", Value: bson.D{{Key: "time", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "price", Value: bson.D{{Key: "$locf", Value: "$price"}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $max ---
 
@@ -593,8 +1062,31 @@ func TestMaxAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestMaxAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestMaxAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("maximumQuantityForState", agg.MaxAccumulator("$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "maximumQuantityForState", Value: bson.D{
+					{Key: "$max", Value: "$quantity"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $maxN ---
 
@@ -644,8 +1136,31 @@ func TestMaxNAccumulator_FindMaxThreeScoresAcrossMultipleGames(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestMaxNAccumulator_ComputeNBasedOnGroupKey
-// after $cond operator is implemented
+func TestMaxNAccumulator_ComputeNBasedOnGroupKey(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			bson.D{{Key: "gameId", Value: "$gameId"}},
+			agg.Accumulate("gamescores", agg.MaxNAccumulator(
+				[]string{"$score", "$playerId"},
+				agg.Cond(agg.Eq("$gameId", "G2"), 1, 3),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "gameId", Value: "$gameId"}}},
+			{Key: "gamescores", Value: bson.D{{Key: "$maxN", Value: bson.D{
+				{Key: "input", Value: []string{"$score", "$playerId"}},
+				{Key: "n", Value: bson.D{{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$eq", Value: bson.A{"$gameId", "G2"}}}},
+					{Key: "then", Value: 1},
+					{Key: "else", Value: 3},
+				}}}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $median ---
 
@@ -670,8 +1185,42 @@ func TestMedianAccumulator_UseMedianAsAnAccumulator(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestMedianAccumulator_UseMedianInSetWindowFieldStage
-// after $setWindowFields stage is implemented
+func TestMedianAccumulator_UseMedianInSetWindowFieldStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("test01_median", agg.MedianAccumulator("$test01"),
+					agg.WithWindowRange(agg.WindowOffset(-3), agg.WindowOffset(3))),
+			},
+			agg.WithSetWindowFieldsSortBy(agg.Sort("test01", agg.Asc)),
+		),
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Include("studentId"),
+			agg.Include("test01_median"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "sortBy", Value: bson.D{{Key: "test01", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "test01_median", Value: bson.D{
+					{Key: "$median", Value: bson.D{
+						{Key: "input", Value: "$test01"},
+						{Key: "method", Value: "approximate"},
+					}},
+					{Key: "window", Value: bson.D{{Key: "range", Value: bson.A{-3, 3}}}},
+				}},
+			}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: int32(0)},
+			{Key: "studentId", Value: int32(1)},
+			{Key: "test01_median", Value: int32(1)},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $mergeObjects ---
 
@@ -711,13 +1260,61 @@ func TestMinAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestMinAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestMinAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("minimumQuantityForState", agg.MinAccumulator("$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "minimumQuantityForState", Value: bson.D{
+					{Key: "$min", Value: "$quantity"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $minMaxScaler ---
 
-// TODO: implement TestMinMaxScalerAccumulator_NormalizeValuesWithCustomRange
-// after $setWindowFields stage is implemented
+func TestMinMaxScalerAccumulator_NormalizeValuesWithCustomRange(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("scaled", agg.MinMaxScalerAccumulator("$a")),
+				agg.WindowOutput("scaledTo100", agg.MinMaxScalerRangeAccumulator("$a", 0, 100)),
+			},
+			agg.WithSetWindowFieldsSortBy(agg.Sort("a", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "sortBy", Value: bson.D{{Key: "a", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "scaled", Value: bson.D{{Key: "$minMaxScaler", Value: bson.D{
+					{Key: "input", Value: "$a"},
+				}}}},
+				{Key: "scaledTo100", Value: bson.D{{Key: "$minMaxScaler", Value: bson.D{
+					{Key: "input", Value: "$a"},
+					{Key: "min", Value: 0},
+					{Key: "max", Value: 100},
+				}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $minN ---
 
@@ -767,8 +1364,31 @@ func TestMinNAccumulator_FindMinThreeDocumentsAcrossMultipleGames(t *testing.T) 
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestMinNAccumulator_ComputeNBasedOnGroupKey
-// after $cond operator is implemented
+func TestMinNAccumulator_ComputeNBasedOnGroupKey(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			bson.D{{Key: "gameId", Value: "$gameId"}},
+			agg.Accumulate("gamescores", agg.MinNAccumulator(
+				[]string{"$score", "$playerId"},
+				agg.Cond(agg.Eq("$gameId", "G2"), 1, 3),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "gameId", Value: "$gameId"}}},
+			{Key: "gamescores", Value: bson.D{{Key: "$minN", Value: bson.D{
+				{Key: "input", Value: []string{"$score", "$playerId"}},
+				{Key: "n", Value: bson.D{{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$eq", Value: bson.A{"$gameId", "G2"}}}},
+					{Key: "then", Value: 1},
+					{Key: "else", Value: 3},
+				}}}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $percentile ---
 
@@ -845,8 +1465,44 @@ func TestPercentileAccumulator_CalculateMultipleValuesAsAccumulator(t *testing.T
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestPercentileAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestPercentileAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("test01_95percentile",
+					agg.PercentileAccumulator("$test01", []float64{0.95}),
+					agg.WithWindowRange(agg.WindowOffset(-3), agg.WindowOffset(3))),
+			},
+			agg.WithSetWindowFieldsSortBy(agg.Sort("test01", agg.Asc)),
+		),
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Include("studentId"),
+			agg.Include("test01_95percentile"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "sortBy", Value: bson.D{{Key: "test01", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "test01_95percentile", Value: bson.D{
+					{Key: "$percentile", Value: bson.D{
+						{Key: "input", Value: "$test01"},
+						{Key: "p", Value: []float64{0.95}},
+						{Key: "method", Value: "approximate"},
+					}},
+					{Key: "window", Value: bson.D{{Key: "range", Value: bson.A{-3, 3}}}},
+				}},
+			}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: int32(0)},
+			{Key: "studentId", Value: int32(1)},
+			{Key: "test01_95percentile", Value: int32(1)},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $push ---
 
@@ -886,13 +1542,77 @@ func TestPushAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestPushAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestPushAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("quantitiesForState", agg.PushAccumulator("$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "quantitiesForState", Value: bson.D{
+					{Key: "$push", Value: "$quantity"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $rank ---
 
-// TODO: implement rank tests
-// after $setWindowFields stage is implemented
+func TestRankAccumulator_RankPartitionsByAnIntegerField(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("rankQuantityForState", agg.RankAccumulator()),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("quantity", agg.Desc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "quantity", Value: int32(-1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "rankQuantityForState", Value: bson.D{{Key: "$rank", Value: bson.D{}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestRankAccumulator_RankPartitionsByADateField(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("rankOrderDateForState", agg.RankAccumulator()),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "rankOrderDateForState", Value: bson.D{{Key: "$rank", Value: bson.D{}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $setUnion ---
 
@@ -912,16 +1632,81 @@ func TestSetUnionAccumulator_FlowersCollection(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSetUnionAccumulator_FlowersCollectionProjection
-// after $setUnion expression operator is implemented in operator.go
+func TestSetUnionAccumulator_FlowersCollectionProjection(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("flowerFieldA"),
+			agg.Include("flowerFieldB"),
+			agg.Compute("allValues", agg.SetUnion("$flowerFieldA", "$flowerFieldB")),
+			agg.Exclude("_id"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "flowerFieldA", Value: int32(1)},
+			{Key: "flowerFieldB", Value: int32(1)},
+			{Key: "allValues", Value: bson.D{{Key: "$setUnion", Value: bson.A{"$flowerFieldA", "$flowerFieldB"}}}},
+			{Key: "_id", Value: int32(0)},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $shift ---
 
-// TODO: implement TestShiftAccumulator_ShiftUsingPositiveInteger
-// after $setWindowFields stage is implemented
+func TestShiftAccumulator_ShiftUsingPositiveInteger(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("shiftQuantityForState",
+					agg.ShiftAccumulator("$quantity", 1, agg.WithShiftDefault("Not available"))),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("quantity", agg.Desc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "quantity", Value: int32(-1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "shiftQuantityForState", Value: bson.D{{Key: "$shift", Value: bson.D{
+					{Key: "output", Value: "$quantity"},
+					{Key: "by", Value: int32(1)},
+					{Key: "default", Value: "Not available"},
+				}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestShiftAccumulator_ShiftUsingNegativeInteger
-// after $setWindowFields stage is implemented
+func TestShiftAccumulator_ShiftUsingNegativeInteger(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("shiftQuantityForState",
+					agg.ShiftAccumulator("$quantity", -1, agg.WithShiftDefault("Not available"))),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("quantity", agg.Desc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "quantity", Value: int32(-1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "shiftQuantityForState", Value: bson.D{{Key: "$shift", Value: bson.D{
+					{Key: "output", Value: "$quantity"},
+					{Key: "by", Value: int32(-1)},
+					{Key: "default", Value: "Not available"},
+				}}}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $stdDevPop ---
 
@@ -941,8 +1726,31 @@ func TestStdDevPopAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestStdDevPopAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestStdDevPopAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("stdDevPopQuantityForState", agg.StdDevPopAccumulator("$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "stdDevPopQuantityForState", Value: bson.D{
+					{Key: "$stdDevPop", Value: "$quantity"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $stdDevSamp ---
 
@@ -963,8 +1771,31 @@ func TestStdDevSampAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestStdDevSampAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestStdDevSampAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("stdDevSampQuantityForState", agg.StdDevSampAccumulator("$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "stdDevSampQuantityForState", Value: bson.D{
+					{Key: "$stdDevSamp", Value: "$quantity"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $sum ---
 
@@ -992,8 +1823,31 @@ func TestSumAccumulator_UseInGroupStage(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSumAccumulator_UseInSetWindowFieldsStage
-// after $setWindowFields stage is implemented
+func TestSumAccumulator_UseInSetWindowFieldsStage(t *testing.T) {
+	got := agg.Pipeline{
+		agg.SetWindowFieldsStage(
+			[]agg.WindowField{
+				agg.WindowOutput("sumQuantityForState", agg.SumAccumulator("$quantity"),
+					agg.WithWindowDocuments(agg.WindowUnbounded, agg.WindowCurrent)),
+			},
+			agg.WithSetWindowFieldsPartitionBy("$state"),
+			agg.WithSetWindowFieldsSortBy(agg.Sort("orderDate", agg.Asc)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$setWindowFields", Value: bson.D{
+			{Key: "partitionBy", Value: "$state"},
+			{Key: "sortBy", Value: bson.D{{Key: "orderDate", Value: int32(1)}}},
+			{Key: "output", Value: bson.D{
+				{Key: "sumQuantityForState", Value: bson.D{
+					{Key: "$sum", Value: "$quantity"},
+					{Key: "window", Value: bson.D{{Key: "documents", Value: bson.A{"unbounded", "current"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // --- $top ---
 
@@ -1095,5 +1949,30 @@ func TestTopNAccumulator_FindThreeHighestScoreDocsAcrossMultipleGames(t *testing
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestTopNAccumulator_ComputingNBasedOnGroupKey
-// after $cond and $eq expression operators are implemented
+func TestTopNAccumulator_ComputingNBasedOnGroupKey(t *testing.T) {
+	got := agg.Pipeline{
+		agg.GroupStage(
+			bson.D{{Key: "gameId", Value: "$gameId"}},
+			agg.Accumulate("gamescores", agg.TopNAccumulator(
+				agg.Cond(agg.Eq("$gameId", "G2"), 1, 3),
+				"$score",
+				agg.Sort("score", agg.Desc),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "gameId", Value: "$gameId"}}},
+			{Key: "gamescores", Value: bson.D{{Key: "$topN", Value: bson.D{
+				{Key: "n", Value: bson.D{{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$eq", Value: bson.A{"$gameId", "G2"}}}},
+					{Key: "then", Value: 1},
+					{Key: "else", Value: 3},
+				}}}},
+				{Key: "sortBy", Value: bson.D{{Key: "score", Value: int32(-1)}}},
+				{Key: "output", Value: "$score"},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}

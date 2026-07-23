@@ -83,7 +83,23 @@ func TestAdd_AddNumbers(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestAdd_PerformAdditionOnDate when date functionality is implemented
+func TestAdd_PerformAdditionOnDate(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("item"),
+			agg.Compute("billing_date", agg.Add("$date", 259200000)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "item", Value: 1},
+			{Key: "billing_date", Value: bson.D{
+				{Key: "$add", Value: bson.A{"$date", 259200000}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestAllElementsTrue(t *testing.T) {
 	got := agg.Pipeline{
@@ -180,8 +196,44 @@ func TestArrayToObject_Example(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestArrayToObject_ObjectToArray when ObjectToArray
-// operator is implemented
+func TestArrayToObject_ObjectToArray(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("instock", agg.ObjectToArray("$instock")),
+		),
+		agg.AddFieldsStage(
+			agg.Assign("instock", agg.ConcatArrays("$instock", []any{
+				bson.D{
+					{Key: "k", Value: "total"},
+					{Key: "v", Value: agg.Sum("$instock.v")},
+				},
+			})),
+		),
+		agg.AddFieldsStage(
+			agg.Assign("instock", agg.ArrayToObject("$instock")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "instock", Value: bson.D{{Key: "$objectToArray", Value: "$instock"}}},
+		}}},
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "instock", Value: bson.D{{Key: "$concatArrays", Value: bson.A{
+				"$instock",
+				[]any{
+					bson.D{
+						{Key: "k", Value: "total"},
+						{Key: "v", Value: bson.D{{Key: "$sum", Value: bson.A{"$instock.v"}}}},
+					},
+				},
+			}}}},
+		}}},
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "instock", Value: bson.D{{Key: "$arrayToObject", Value: "$instock"}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestAsin(t *testing.T) {
 	got := agg.Pipeline{
@@ -603,7 +655,78 @@ func TestCond(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestConvert_Example when $switch is implemented
+func TestConvert_Example(t *testing.T) {
+	onNull, err := bson.ParseDecimal128("0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("convertedPrice", agg.Convert("$price", "decimal",
+				agg.WithConvertOnError("Error"),
+				agg.WithConvertOnNull(onNull))),
+			agg.Assign("convertedQty", agg.Convert("$qty", "int",
+				agg.WithConvertOnError(agg.Concat(
+					"Could not convert ",
+					agg.ToString("$qty"),
+					" to type integer.",
+				)),
+				agg.WithConvertOnNull(0))),
+		),
+		agg.ProjectStage(
+			agg.Compute("totalPrice", agg.Switch([]agg.SwitchCase{
+				agg.Case(agg.Eq(agg.Type("$convertedPrice"), "string"), "NaN"),
+				agg.Case(agg.Eq(agg.Type("$convertedQty"), "string"), "NaN"),
+			},
+				agg.WithSwitchDefault(agg.Multiply("$convertedPrice", "$convertedQty")),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "convertedPrice", Value: bson.D{{Key: "$convert", Value: bson.D{
+				{Key: "input", Value: "$price"},
+				{Key: "to", Value: "decimal"},
+				{Key: "onError", Value: "Error"},
+				{Key: "onNull", Value: onNull},
+			}}}},
+			{Key: "convertedQty", Value: bson.D{{Key: "$convert", Value: bson.D{
+				{Key: "input", Value: "$qty"},
+				{Key: "to", Value: "int"},
+				{Key: "onError", Value: bson.D{{Key: "$concat", Value: bson.A{
+					"Could not convert ",
+					bson.D{{Key: "$toString", Value: "$qty"}},
+					" to type integer.",
+				}}}},
+				{Key: "onNull", Value: 0},
+			}}}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "totalPrice", Value: bson.D{
+				{Key: "$switch", Value: bson.D{
+					{Key: "branches", Value: bson.A{
+						bson.D{
+							{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{
+								bson.D{{Key: "$type", Value: "$convertedPrice"}},
+								"string",
+							}}}},
+							{Key: "then", Value: "NaN"},
+						},
+						bson.D{
+							{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{
+								bson.D{{Key: "$type", Value: "$convertedQty"}},
+								"string",
+							}}}},
+							{Key: "then", Value: "NaN"},
+						},
+					}},
+					{Key: "default", Value: bson.D{{Key: "$multiply", Value: bson.A{"$convertedPrice", "$convertedQty"}}}},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestConvert_ConvertHexadecimalStringToInteger(t *testing.T) {
 	got := agg.Pipeline{
@@ -738,12 +861,12 @@ func TestCreateObjectId(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: add $merge stage when implemented
 func TestDateAdd_AddFutureDate(t *testing.T) {
 	got := agg.Pipeline{
 		agg.ProjectStage(
 			agg.Compute("expectedDeliveryDate", agg.DateAdd("$purchaseDate", "day", 3)),
 		),
+		agg.MergeStage("shipping"),
 	}
 	want := bson.A{
 		bson.D{{Key: "$project", Value: bson.D{
@@ -754,6 +877,9 @@ func TestDateAdd_AddFutureDate(t *testing.T) {
 					{Key: "amount", Value: 3},
 				}},
 			}},
+		}}},
+		bson.D{{Key: "$merge", Value: bson.D{
+			{Key: "into", Value: "shipping"},
 		}}},
 	}
 	assertPipelineEqual(t, got, want)
@@ -1107,8 +1233,7 @@ func TestDateFromString_OnNull(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestDateSubtract_SubtractFixedAmount and TestDateSubtract_FilterByRelativeDates
-// when $expr is implemented
+// TODO: implement TestDateSubtract_SubtractFixedAmount and TestDateSubtract_FilterByRelativeDates when $expr is implemented
 
 func TestDateSubtract_AdjustForDaylightSavingsTime(t *testing.T) {
 	got := agg.Pipeline{
@@ -1489,7 +1614,36 @@ func TestDeserializeEJSON_DeserializeExtendedJSONDocument(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestDeserializeEJSON_ParseJSONStringAndDeserialize when the $documents stage and $convert operator are implemented
+func TestDeserializeEJSON_ParseJSONStringAndDeserialize(t *testing.T) {
+	got := agg.Pipeline{
+		agg.DocumentsStage(bson.A{
+			bson.D{{Key: "jsonData", Value: `{"_id":{"$oid":"507f1f77bcf86cd799439011"},"title":"The Matrix","year":{"$numberInt":"1999"},"rating":{"$numberDouble":"8.7"}}`}},
+		}),
+		agg.ProjectStage(
+			agg.Compute("parsed", agg.Convert("$jsonData", "object")),
+		),
+		agg.ProjectStage(
+			agg.Compute("movie", agg.DeserializeEJSON("$parsed")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$documents", Value: bson.A{
+			bson.D{{Key: "jsonData", Value: `{"_id":{"$oid":"507f1f77bcf86cd799439011"},"title":"The Matrix","year":{"$numberInt":"1999"},"rating":{"$numberDouble":"8.7"}}`}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "parsed", Value: bson.D{{Key: "$convert", Value: bson.D{
+				{Key: "input", Value: "$jsonData"},
+				{Key: "to", Value: "object"},
+			}}}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "movie", Value: bson.D{{Key: "$deserializeEJSON", Value: bson.D{
+				{Key: "input", Value: "$parsed"},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestDeserializeEJSON_DeserializeSpecificFields(t *testing.T) {
 	got := agg.Pipeline{
@@ -1880,7 +2034,30 @@ func TestHash_HashAFieldValue(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestHash_HashALiteralString when the $documents stage is implemented
+func TestHash_HashALiteralString(t *testing.T) {
+	got := agg.Pipeline{
+		agg.DocumentsStage(bson.A{
+			bson.D{{Key: "val", Value: "hello"}},
+		}),
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Compute("hash", agg.Hash("$val", "xxh64")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$documents", Value: bson.A{
+			bson.D{{Key: "val", Value: "hello"}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "hash", Value: bson.D{{Key: "$hash", Value: bson.D{
+				{Key: "input", Value: "$val"},
+				{Key: "algorithm", Value: "xxh64"},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestHash_HashBinData(t *testing.T) {
 	got := agg.Pipeline{
@@ -1899,7 +2076,30 @@ func TestHash_HashBinData(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestHash_NullOrMissingInput when the $documents stage is implemented
+func TestHash_NullOrMissingInput(t *testing.T) {
+	got := agg.Pipeline{
+		agg.DocumentsStage(bson.A{
+			bson.D{{Key: "val", Value: nil}},
+			bson.D{},
+		}),
+		agg.ProjectStage(
+			agg.Compute("hash", agg.Hash("$val", "sha256")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$documents", Value: bson.A{
+			bson.D{{Key: "val", Value: nil}},
+			bson.D{},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "hash", Value: bson.D{{Key: "$hash", Value: bson.D{
+				{Key: "input", Value: "$val"},
+				{Key: "algorithm", Value: "sha256"},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestHexHash_HashAFieldValue(t *testing.T) {
 	got := agg.Pipeline{
@@ -1920,7 +2120,30 @@ func TestHexHash_HashAFieldValue(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestHexHash_NullOrMissingInput when the $documents stage is implemented
+func TestHexHash_NullOrMissingInput(t *testing.T) {
+	got := agg.Pipeline{
+		agg.DocumentsStage(bson.A{
+			bson.D{{Key: "val", Value: nil}},
+			bson.D{},
+		}),
+		agg.ProjectStage(
+			agg.Compute("hexHash", agg.HexHash("$val", "sha256")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$documents", Value: bson.A{
+			bson.D{{Key: "val", Value: nil}},
+			bson.D{},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "hexHash", Value: bson.D{{Key: "$hexHash", Value: bson.D{
+				{Key: "input", Value: "$val"},
+				{Key: "algorithm", Value: "sha256"},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestHour(t *testing.T) {
 	got := agg.Pipeline{
@@ -2198,7 +2421,36 @@ func TestIndexOfCP_WithIndexOfOptions(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement $isArray tests when $cond is implemented
+func TestIsArray_Example(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("items", agg.Cond(
+				agg.And(agg.IsArray("$instock"), agg.IsArray("$ordered")),
+				agg.ConcatArrays("$instock", "$ordered"),
+				"One or more fields is not an array.",
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "items", Value: bson.D{
+				{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{
+						{Key: "$and", Value: bson.A{
+							bson.D{{Key: "$isArray", Value: bson.A{"$instock"}}},
+							bson.D{{Key: "$isArray", Value: bson.A{"$ordered"}}},
+						}},
+					}},
+					{Key: "then", Value: bson.D{
+						{Key: "$concatArrays", Value: bson.A{"$instock", "$ordered"}},
+					}},
+					{Key: "else", Value: "One or more fields is not an array."},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestIsNumber_CheckIfFieldIsNumeric(t *testing.T) {
 	got := agg.Pipeline{
@@ -2216,7 +2468,68 @@ func TestIsNumber_CheckIfFieldIsNumeric(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestIsNumber_ConditionallyModifyFields when $cond is implemented
+func TestIsNumber_ConditionallyModifyFields(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("points", agg.Cond(
+				agg.IsNumber("$grade"),
+				"$grade",
+				agg.Switch([]agg.SwitchCase{
+					agg.Case(agg.Eq("$grade", "A"), 4),
+					agg.Case(agg.Eq("$grade", "B"), 3),
+					agg.Case(agg.Eq("$grade", "C"), 2),
+					agg.Case(agg.Eq("$grade", "D"), 1),
+					agg.Case(agg.Eq("$grade", "F"), 0),
+				}),
+			)),
+		),
+		agg.GroupStage(
+			"$student_id",
+			agg.Accumulate("GPA", agg.AvgAccumulator("$points")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "points", Value: bson.D{
+				{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$isNumber", Value: "$grade"}}},
+					{Key: "then", Value: "$grade"},
+					{Key: "else", Value: bson.D{
+						{Key: "$switch", Value: bson.D{
+							{Key: "branches", Value: bson.A{
+								bson.D{
+									{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{"$grade", "A"}}}},
+									{Key: "then", Value: 4},
+								},
+								bson.D{
+									{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{"$grade", "B"}}}},
+									{Key: "then", Value: 3},
+								},
+								bson.D{
+									{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{"$grade", "C"}}}},
+									{Key: "then", Value: 2},
+								},
+								bson.D{
+									{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{"$grade", "D"}}}},
+									{Key: "then", Value: 1},
+								},
+								bson.D{
+									{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{"$grade", "F"}}}},
+									{Key: "then", Value: 0},
+								},
+							}},
+						}},
+					}},
+				}},
+			}},
+		}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$student_id"},
+			{Key: "GPA", Value: bson.D{{Key: "$avg", Value: "$points"}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestIsoDayOfWeek(t *testing.T) {
 	got := agg.Pipeline{
@@ -2626,7 +2939,40 @@ func TestMedian(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement $mergeObjects tests when $lookup and $replaceRoot stages are implemented
+func TestMergeObjects(t *testing.T) {
+	got := agg.Pipeline{
+		agg.LookupStage("fromItems",
+			agg.WithLookupFrom("items"),
+			agg.WithLookupLocalField("item"),
+			agg.WithLookupForeignField("item"),
+		),
+		agg.ReplaceRootStage(agg.MergeObjects(
+			agg.ArrayElemAt("$fromItems", 0),
+			agg.RootObject(),
+		)),
+		agg.ProjectStage(
+			agg.Exclude("fromItems"),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: "items"},
+			{Key: "localField", Value: "item"},
+			{Key: "foreignField", Value: "item"},
+			{Key: "as", Value: "fromItems"},
+		}}},
+		bson.D{{Key: "$replaceRoot", Value: bson.D{
+			{Key: "newRoot", Value: bson.D{{Key: "$mergeObjects", Value: bson.A{
+				bson.D{{Key: "$arrayElemAt", Value: bson.A{"$fromItems", 0}}},
+				"$$ROOT",
+			}}}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "fromItems", Value: 0},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 // TODO: implement TestMeta_TextScore when $text and $search are implemented
 
@@ -2835,7 +3181,31 @@ func TestObjectToArray_Example(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestObjectToArray_SumNestedFields when $unwind is implemented
+func TestObjectToArray_SumNestedFields(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Compute("warehouses", agg.ObjectToArray("$instock")),
+		),
+		agg.UnwindStage("$warehouses"),
+		agg.GroupStage(
+			"$warehouses.k",
+			agg.Accumulate("total", agg.SumAccumulator("$warehouses.v")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "warehouses", Value: bson.D{{Key: "$objectToArray", Value: "$instock"}}},
+		}}},
+		bson.D{{Key: "$unwind", Value: bson.D{
+			{Key: "path", Value: "$warehouses"},
+		}}},
+		bson.D{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$warehouses.k"},
+			{Key: "total", Value: bson.D{{Key: "$sum", Value: "$warehouses.v"}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestOr(t *testing.T) {
 	got := agg.Pipeline{
@@ -2921,7 +3291,6 @@ func TestRadiansToDegrees(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: add MergeStage when $merge is implemented
 func TestRand_GenerateRandomDataPoints(t *testing.T) {
 	got := agg.Pipeline{
 		agg.SetStage(
@@ -2930,6 +3299,7 @@ func TestRand_GenerateRandomDataPoints(t *testing.T) {
 		agg.SetStage(
 			agg.Assign("amount", agg.Floor("$amount")),
 		),
+		agg.MergeStage("donors"),
 	}
 	want := bson.A{
 		bson.D{{Key: "$set", Value: bson.D{
@@ -2940,6 +3310,9 @@ func TestRand_GenerateRandomDataPoints(t *testing.T) {
 		}}},
 		bson.D{{Key: "$set", Value: bson.D{
 			{Key: "amount", Value: bson.D{{Key: "$floor", Value: "$amount"}}},
+		}}},
+		bson.D{{Key: "$merge", Value: bson.D{
+			{Key: "into", Value: "donors"},
 		}}},
 	}
 	assertPipelineEqual(t, got, want)
@@ -3117,7 +3490,47 @@ func TestReduce_ComputingAMultipleReductions(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestReduce_UseAsValueAsAndArrayIndexAs when $toString is implemented
+func TestReduce_UseAsValueAsAndArrayIndexAs(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Include("name"),
+			agg.Compute("text", agg.Reduce("$hobbies", "My hobbies include:",
+				agg.Concat(
+					"$$accumulatedText",
+					" ",
+					agg.ToString(agg.Add("$$myIndex", 1)),
+					") ",
+					"$$hobby",
+				),
+				agg.WithReduceAs("hobby"),
+				agg.WithReduceValueAs("accumulatedText"),
+				agg.WithReduceArrayIndexAs("myIndex"),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "name", Value: 1},
+			{Key: "text", Value: bson.D{{Key: "$reduce", Value: bson.D{
+				{Key: "input", Value: "$hobbies"},
+				{Key: "initialValue", Value: "My hobbies include:"},
+				{Key: "in", Value: bson.D{{Key: "$concat", Value: bson.A{
+					"$$accumulatedText",
+					" ",
+					bson.D{{Key: "$toString", Value: bson.D{{Key: "$add", Value: bson.A{"$$myIndex", 1}}}}},
+					") ",
+					"$$hobby",
+				}}}},
+				{Key: "as", Value: "hobby"},
+				{Key: "valueAs", Value: "accumulatedText"},
+				{Key: "arrayIndexAs", Value: "myIndex"},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestRegexFind_AndItsOptions(t *testing.T) {
 	got := agg.Pipeline{
@@ -3255,7 +3668,34 @@ func TestRegexFindAll_ParseEmailFromString(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestRegexFindAll_UseCapturedGroupingsToParseUserName when $reduce is implemented
+func TestRegexFindAll_UseCapturedGroupingsToParseUserName(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("names", agg.RegexFindAll("$comment", bson.Regex{
+				Pattern: `([a-z0-9_.+-]+)@[a-z0-9_.+-]+\.[a-z0-9_.+-]+`, Options: "i"})),
+		),
+		agg.SetStage(
+			agg.Assign("names", agg.Reduce("$names.captures", bson.A{},
+				agg.ConcatArrays("$$value", "$$this"))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "names", Value: bson.D{{Key: "$regexFindAll", Value: bson.D{
+				{Key: "input", Value: "$comment"},
+				{Key: "regex", Value: bson.Regex{Pattern: `([a-z0-9_.+-]+)@[a-z0-9_.+-]+\.[a-z0-9_.+-]+`, Options: "i"}},
+			}}}},
+		}}},
+		bson.D{{Key: "$set", Value: bson.D{
+			{Key: "names", Value: bson.D{{Key: "$reduce", Value: bson.D{
+				{Key: "input", Value: "$names.captures"},
+				{Key: "initialValue", Value: bson.A{}},
+				{Key: "in", Value: bson.D{{Key: "$concatArrays", Value: bson.A{"$$value", "$$this"}}}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestRegexMatch_AndItsOptions(t *testing.T) {
 	got := agg.Pipeline{
@@ -3314,7 +3754,32 @@ func TestRegexMatch_IOption(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestRegexMatch_CheckEmailAddress when $cond is implemented
+func TestRegexMatch_CheckEmailAddress(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("category", agg.Cond(
+				agg.RegexMatch("$comment", bson.Regex{Pattern: "[a-z0-9_.+-]+@mongodb.com", Options: "i"}),
+				"Employee",
+				"External",
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "category", Value: bson.D{
+				{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$regexMatch", Value: bson.D{
+						{Key: "input", Value: "$comment"},
+						{Key: "regex", Value: bson.Regex{Pattern: "[a-z0-9_.+-]+@mongodb.com", Options: "i"}},
+					}}}},
+					{Key: "then", Value: "Employee"},
+					{Key: "else", Value: "External"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestReplaceAll_ReplaceUsingString(t *testing.T) {
 	got := agg.Pipeline{
@@ -3532,7 +3997,29 @@ func TestSerializeEJSON_RelaxedExtendedJSONExample(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSerializeEJSON_ConvertToJSONString when the $toString operator is implemented
+func TestSerializeEJSON_ConvertToJSONString(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("title", query.Eq("The Godfather"))),
+		agg.ProjectStage(
+			agg.Include("title"),
+			agg.Compute("jsonString", agg.ToString(agg.SerializeEJSON(agg.RootObject()))),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "title", Value: bson.D{{Key: "$eq", Value: "The Godfather"}}},
+		}}},
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "title", Value: 1},
+			{Key: "jsonString", Value: bson.D{{Key: "$toString", Value: bson.D{
+				{Key: "$serializeEJSON", Value: bson.D{
+					{Key: "input", Value: "$$ROOT"},
+				}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestSerializeEJSON_SerializeSpecificFields(t *testing.T) {
 	got := agg.Pipeline{
@@ -3624,7 +4111,101 @@ func TestSetEquals(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// implement $setField tests when $replaceWith is implemented
+func TestSetField_AddFieldsThatContainPeriods(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ReplaceWithStage(agg.SetDocField("price.usd", agg.RootObject(), "$price")),
+		agg.UnsetStage("price"),
+	}
+	want := bson.A{
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$setField", Value: bson.D{
+			{Key: "field", Value: "price.usd"},
+			{Key: "input", Value: "$$ROOT"},
+			{Key: "value", Value: "$price"},
+		}}}}},
+		bson.D{{Key: "$unset", Value: []string{"price"}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestSetField_AddFieldsThatStartWithADollarSign(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ReplaceWithStage(agg.SetDocField(agg.Literal("$price"), agg.RootObject(), "$price")),
+		agg.UnsetStage("price"),
+	}
+	want := bson.A{
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$setField", Value: bson.D{
+			{Key: "field", Value: bson.D{{Key: "$literal", Value: "$price"}}},
+			{Key: "input", Value: "$$ROOT"},
+			{Key: "value", Value: "$price"},
+		}}}}},
+		bson.D{{Key: "$unset", Value: []string{"price"}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestSetField_UpdateFieldsThatContainPeriods(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("_id", query.Eq(1))),
+		agg.ReplaceWithStage(agg.SetDocField("price.usd", agg.RootObject(), 49.99)),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "$eq", Value: 1}}},
+		}}},
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$setField", Value: bson.D{
+			{Key: "field", Value: "price.usd"},
+			{Key: "input", Value: "$$ROOT"},
+			{Key: "value", Value: 49.99},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestSetField_UpdateFieldsThatStartWithADollarSign(t *testing.T) {
+	got := agg.Pipeline{
+		agg.MatchStage(query.Field("_id", query.Eq(1))),
+		agg.ReplaceWithStage(agg.SetDocField(agg.Literal("$price"), agg.RootObject(), 49.99)),
+	}
+	want := bson.A{
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "_id", Value: bson.D{{Key: "$eq", Value: 1}}},
+		}}},
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$setField", Value: bson.D{
+			{Key: "field", Value: bson.D{{Key: "$literal", Value: "$price"}}},
+			{Key: "input", Value: "$$ROOT"},
+			{Key: "value", Value: 49.99},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestSetField_RemoveFieldsThatContainPeriods(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ReplaceWithStage(agg.SetDocField("price.usd", agg.RootObject(), "$$REMOVE")),
+	}
+	want := bson.A{
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$setField", Value: bson.D{
+			{Key: "field", Value: "price.usd"},
+			{Key: "input", Value: "$$ROOT"},
+			{Key: "value", Value: "$$REMOVE"},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestSetField_RemoveFieldsThatStartWithADollarSign(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ReplaceWithStage(agg.SetDocField(agg.Literal("$price"), agg.RootObject(), "$$REMOVE")),
+	}
+	want := bson.A{
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$setField", Value: bson.D{
+			{Key: "field", Value: bson.D{{Key: "$literal", Value: "$price"}}},
+			{Key: "input", Value: "$$ROOT"},
+			{Key: "value", Value: "$$REMOVE"},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestSetIntersection_ElementsArrayExample(t *testing.T) {
 	got := agg.Pipeline{
@@ -3804,9 +4385,33 @@ func TestSinh(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSize when $cond is implemented
+func TestSize(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("item"),
+			agg.Compute("numberOfColors", agg.Cond(
+				agg.IsArray("$colors"),
+				agg.Size("$colors"),
+				"NA",
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "item", Value: 1},
+			{Key: "numberOfColors", Value: bson.D{
+				{Key: "$cond", Value: bson.D{
+					{Key: "if", Value: bson.D{{Key: "$isArray", Value: bson.A{"$colors"}}}},
+					{Key: "then", Value: bson.D{{Key: "$size", Value: "$colors"}}},
+					{Key: "else", Value: "NA"},
+				}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestSplit after $unwind stage is implemented
+// TODO: implement TestSplit when the $regex query operator is implemented
 
 func TestSlice_WithoutSliceOptions(t *testing.T) {
 	got := agg.Pipeline{
@@ -4169,9 +4774,41 @@ func TestSubtract_SubtractNumbers(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestSubtract_SubtractTwoDates when date functionality is implemented
+func TestSubtract_SubtractTwoDates(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("item"),
+			agg.Compute("dateDifference", agg.Subtract("$$NOW", "$date")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "item", Value: 1},
+			{Key: "dateDifference", Value: bson.D{
+				{Key: "$subtract", Value: bson.A{"$$NOW", "$date"}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
-// TODO: implement TestSubtract_SubtractMillisecondsFromDate when date functionality is implemented
+func TestSubtract_SubtractMillisecondsFromDate(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Include("item"),
+			agg.Compute("dateDifference", agg.Subtract("$date", 300000)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "item", Value: 1},
+			{Key: "dateDifference", Value: bson.D{
+				{Key: "$subtract", Value: bson.A{"$date", 300000}},
+			}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestSubtype(t *testing.T) {
 	got := agg.Pipeline{
@@ -4343,7 +4980,42 @@ func TestToArray_ConvertBinDataToArray(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement $toBool tests when $switch is implemented
+func TestToBool_Example(t *testing.T) {
+	got := agg.Pipeline{
+		agg.AddFieldsStage(
+			agg.Assign("convertedShippedFlag", agg.Switch([]agg.SwitchCase{
+				agg.Case(agg.Eq("$shipped", "false"), false),
+				agg.Case(agg.Eq("$shipped", ""), false),
+			},
+				agg.WithSwitchDefault(agg.ToBool("$shipped")),
+			)),
+		),
+		agg.MatchStage(query.Field("convertedShippedFlag", query.Eq(false))),
+	}
+	want := bson.A{
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "convertedShippedFlag", Value: bson.D{
+				{Key: "$switch", Value: bson.D{
+					{Key: "branches", Value: bson.A{
+						bson.D{
+							{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{"$shipped", "false"}}}},
+							{Key: "then", Value: false},
+						},
+						bson.D{
+							{Key: "case", Value: bson.D{{Key: "$eq", Value: bson.A{"$shipped", ""}}}},
+							{Key: "then", Value: false},
+						},
+					}},
+					{Key: "default", Value: bson.D{{Key: "$toBool", Value: "$shipped"}}},
+				}},
+			}},
+		}}},
+		bson.D{{Key: "$match", Value: bson.D{
+			{Key: "convertedShippedFlag", Value: bson.D{{Key: "$eq", Value: false}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestToDate(t *testing.T) {
 	got := agg.Pipeline{
@@ -4397,7 +5069,25 @@ func TestToDouble(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement $toHashedIndexKey tests when $documents is implemented
+func TestToHashedIndexKey_Example(t *testing.T) {
+	got := agg.Pipeline{
+		agg.DocumentsStage(bson.A{
+			bson.D{{Key: "val", Value: "string to hash"}},
+		}),
+		agg.AddFieldsStage(
+			agg.Assign("hashedVal", agg.ToHashedIndexKey("$val")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$documents", Value: bson.A{
+			bson.D{{Key: "val", Value: "string to hash"}},
+		}}},
+		bson.D{{Key: "$addFields", Value: bson.D{
+			{Key: "hashedVal", Value: bson.D{{Key: "$toHashedIndexKey", Value: "$val"}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestToInt(t *testing.T) {
 	got := agg.Pipeline{
@@ -4617,7 +5307,25 @@ func TestTrunc_WithTruncPlace(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement $tsIncrement tests when $expr is implemented
+func TestTsIncrement_ObtainTheIncrementingOrdinalFromATimestampField(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Include("saleTimestamp"),
+			agg.Compute("saleIncrement", agg.TsIncrement("$saleTimestamp")),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "saleTimestamp", Value: 1},
+			{Key: "saleIncrement", Value: bson.D{{Key: "$tsIncrement", Value: "$saleTimestamp"}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+// TODO: implement the $tsIncrement change stream cursor test when $expr is implemented
 
 func TestTsSecond_ObtainNumberOfSecondsFromTimestampField(t *testing.T) {
 	got := agg.Pipeline{
@@ -4671,7 +5379,51 @@ func TestType(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement $unsetField tests when $replaceWith is implemented
+func TestUnsetField_RemoveFieldsThatContainPeriods(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ReplaceWithStage(agg.UnsetDocField("price.usd", agg.RootObject())),
+	}
+	want := bson.A{
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$unsetField", Value: bson.D{
+			{Key: "field", Value: "price.usd"},
+			{Key: "input", Value: "$$ROOT"},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestUnsetField_RemoveFieldsThatStartWithADollarSign(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ReplaceWithStage(agg.UnsetDocField(agg.Literal("$price"), agg.RootObject())),
+	}
+	want := bson.A{
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$unsetField", Value: bson.D{
+			{Key: "field", Value: bson.D{{Key: "$literal", Value: "$price"}}},
+			{Key: "input", Value: "$$ROOT"},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
+
+func TestUnsetField_RemoveASubfield(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ReplaceWithStage(agg.SetDocField("price", agg.RootObject(),
+			agg.UnsetDocField("euro", agg.GetField("price")))),
+	}
+	want := bson.A{
+		bson.D{{Key: "$replaceWith", Value: bson.D{{Key: "$setField", Value: bson.D{
+			{Key: "field", Value: "price"},
+			{Key: "input", Value: "$$ROOT"},
+			{Key: "value", Value: bson.D{{Key: "$unsetField", Value: bson.D{
+				{Key: "field", Value: "euro"},
+				{Key: "input", Value: bson.D{{Key: "$getField", Value: bson.D{
+					{Key: "field", Value: "price"},
+				}}}},
+			}}}},
+		}}}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
 
 func TestWeek(t *testing.T) {
 	got := agg.Pipeline{
@@ -4786,4 +5538,43 @@ func TestZip_WithZipUseLongestLengthAndZipDefaults(t *testing.T) {
 	assertPipelineEqual(t, got, want)
 }
 
-// TODO: implement TestZip_FilteringAndPreservingIndexes when $let is implemented
+func TestZip_FilteringAndPreservingIndexes(t *testing.T) {
+	got := agg.Pipeline{
+		agg.ProjectStage(
+			agg.Exclude("_id"),
+			agg.Compute("pages", agg.Filter(
+				agg.Zip([]any{
+					"$pages",
+					agg.Range(0, agg.Size("$pages")),
+				}),
+				agg.Let([]agg.SetField{
+					agg.Assign("page", agg.ArrayElemAt("$$pageWithIndex", 0)),
+				},
+					agg.Gte("$$page.reviews", 1),
+				),
+				agg.WithFilterAs("pageWithIndex"),
+			)),
+		),
+	}
+	want := bson.A{
+		bson.D{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "pages", Value: bson.D{{Key: "$filter", Value: bson.D{
+				{Key: "input", Value: bson.D{{Key: "$zip", Value: bson.D{
+					{Key: "inputs", Value: bson.A{
+						"$pages",
+						bson.D{{Key: "$range", Value: bson.A{0, bson.D{{Key: "$size", Value: "$pages"}}}}},
+					}},
+				}}}},
+				{Key: "as", Value: "pageWithIndex"},
+				{Key: "cond", Value: bson.D{{Key: "$let", Value: bson.D{
+					{Key: "vars", Value: bson.D{
+						{Key: "page", Value: bson.D{{Key: "$arrayElemAt", Value: bson.A{"$$pageWithIndex", 0}}}},
+					}},
+					{Key: "in", Value: bson.D{{Key: "$gte", Value: bson.A{"$$page.reviews", 1}}}},
+				}}}},
+			}}}},
+		}}},
+	}
+	assertPipelineEqual(t, got, want)
+}
